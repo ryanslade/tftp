@@ -116,7 +116,8 @@ func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 
 func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	log.Println("Handling WRQ")
-	conn, err := net.DialUDP("udp", nil, remoteAddress)
+	// Don't use DialUDP here, see https://groups.google.com/forum/#!topic/golang-nuts/Mb3MS9Khito
+	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		log.Println(err)
 		return
@@ -125,7 +126,7 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	f, err := os.Create(filename)
 	if err != nil {
 		log.Println(err)
-		_, writeErr := conn.Write(createErrorPacket(0, err.Error()))
+		_, writeErr := conn.WriteToUDP(createErrorPacket(0, err.Error()), remoteAddress)
 		if writeErr != nil {
 			log.Println(writeErr)
 		}
@@ -140,7 +141,7 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	// Check for write errors
 	binary.Write(ack, binary.BigEndian, OpACK)
 	binary.Write(ack, binary.BigEndian, tid)
-	_, err = conn.Write(ack.Bytes())
+	_, err = conn.WriteToUDP(ack.Bytes(), remoteAddress)
 	if err != nil {
 		log.Println(err)
 		return
@@ -172,7 +173,7 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	// Check for write errors
 	binary.Write(ack, binary.BigEndian, OpACK)
 	binary.Write(ack, binary.BigEndian, tid)
-	_, err = conn.Write(ack.Bytes())
+	_, err = conn.WriteToUDP(ack.Bytes(), remoteAddress)
 	if err != nil {
 		log.Println(err)
 		return
