@@ -33,6 +33,7 @@ func (o OpCode) String() string {
 
 const (
 	maxPacketSize = 2048
+	blockSize     = 512
 )
 
 func getOpCode(packet []byte) (OpCode, error) {
@@ -78,7 +79,8 @@ func readRequest(conn *net.UDPConn) error {
 		return fmt.Errorf("Error reading mode: %v", err)
 	}
 
-	if string(mode[:len(mode)-1]) != "netascii" {
+	modeString := string(mode[:len(mode)-1])
+	if modeString != "netascii" && modeString != "octet" {
 		return fmt.Errorf("Unknown mode: %v", string(mode))
 	}
 
@@ -138,6 +140,8 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 
 	ack := new(bytes.Buffer)
 
+	// Acknowledge WRQ
+
 	// Check for write errors
 	binary.Write(ack, binary.BigEndian, OpACK)
 	binary.Write(ack, binary.BigEndian, tid)
@@ -148,36 +152,63 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	}
 
 	packet := make([]byte, maxPacketSize)
-	n, _, err := conn.ReadFromUDP(packet)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	opcode, err := getOpCode(packet)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	if opcode != OpDATA {
-		log.Println("Expected DATA packet, got %v", opcode)
-		return
-	}
-	_, err = f.Write(packet[4 : n-1])
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	tid++ // TODO, check that Block number in data packet matches
 
-	ack.Reset()
-	// Check for write errors
-	binary.Write(ack, binary.BigEndian, OpACK)
-	binary.Write(ack, binary.BigEndian, tid)
-	_, err = conn.WriteToUDP(ack.Bytes(), remoteAddress)
-	if err != nil {
-		log.Println(err)
-		return
+	for {
+		tid++
+
+		// Read data packet
+		n, _, err := conn.ReadFromUDP(packet)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		log.Println("Read", n)
+
+		opcode, err := getOpCode(packet)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if opcode != OpDATA {
+			log.Println("Expected DATA packet, got %v", opcode)
+			return
+		}
+
+		packetTID := binary.BigEndian.Uint16(packet[2:4])
+		if packetTID != tid {
+			log.Println("Expected TID %d, got %d", tid, packetTID)
+			_, err := conn.WriteToUDP(createErrorPacket(5, "Unknown transfer id"), remoteAddress)
+			if err != nil {
+				log.Println(err)
+			}
+			return
+		}
+
+		// Write data
+		wrote, err := f.Write(packet[4:n])
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		log.Println("Wrote", wrote)
+
+		ack.Reset()
+		// Check for write errors
+		binary.Write(ack, binary.BigEndian, OpACK)
+		binary.Write(ack, binary.BigEndian, tid)
+		_, err = conn.WriteToUDP(ack.Bytes(), remoteAddress)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		if n < 4+blockSize {
+			// We're done
+			log.Println("Succesfully received", filename)
+			return
+		}
 	}
+
 }
 
 func main() {
