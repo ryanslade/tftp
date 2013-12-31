@@ -116,6 +116,15 @@ func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 	log.Println("Handling RRQ")
 }
 
+func writeAck(packet []byte, tid uint16) error {
+	if len(packet) != 4 {
+		return fmt.Errorf("Expected slice of length 4")
+	}
+	binary.BigEndian.PutUint16(packet, uint16(OpACK))
+	binary.BigEndian.PutUint16(packet[2:4], tid)
+	return nil
+}
+
 func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	log.Println("Handling WRQ")
 	// Don't use DialUDP here, see https://groups.google.com/forum/#!topic/golang-nuts/Mb3MS9Khito
@@ -138,14 +147,16 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 
 	tid := uint16(0)
 
-	ack := new(bytes.Buffer)
-
 	// Acknowledge WRQ
 
 	// Check for write errors
-	binary.Write(ack, binary.BigEndian, OpACK)
-	binary.Write(ack, binary.BigEndian, tid)
-	_, err = conn.WriteToUDP(ack.Bytes(), remoteAddress)
+	ack := make([]byte, 4)
+	err = writeAck(ack, tid)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	_, err = conn.WriteToUDP(ack, remoteAddress)
 	if err != nil {
 		log.Println(err)
 		return
@@ -162,7 +173,6 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 			log.Println(err)
 			return
 		}
-		log.Println("Read", n)
 
 		opcode, err := getOpCode(packet)
 		if err != nil {
@@ -185,18 +195,19 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 		}
 
 		// Write data
-		wrote, err := f.Write(packet[4:n])
+		_, err = f.Write(packet[4:n])
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		log.Println("Wrote", wrote)
 
-		ack.Reset()
 		// Check for write errors
-		binary.Write(ack, binary.BigEndian, OpACK)
-		binary.Write(ack, binary.BigEndian, tid)
-		_, err = conn.WriteToUDP(ack.Bytes(), remoteAddress)
+		err = writeAck(ack, tid)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		_, err = conn.WriteToUDP(ack, remoteAddress)
 		if err != nil {
 			log.Println(err)
 			return
@@ -208,7 +219,6 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 			return
 		}
 	}
-
 }
 
 func main() {
