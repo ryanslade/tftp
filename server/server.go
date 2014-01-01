@@ -40,11 +40,11 @@ func getOpCode(packet []byte) (OpCode, error) {
 	if len(packet) < 2 {
 		return OpERROR, fmt.Errorf("Packet too small to get opcode")
 	}
-	opcode := binary.BigEndian.Uint16(packet)
+	opcode := OpCode(binary.BigEndian.Uint16(packet))
 	if opcode > 5 {
 		return OpERROR, fmt.Errorf("Unknown opcode: %d", opcode)
 	}
-	return OpCode(opcode), nil
+	return opcode, nil
 }
 
 func readRequest(conn *net.UDPConn) error {
@@ -54,7 +54,7 @@ func readRequest(conn *net.UDPConn) error {
 	if err != nil {
 		return err
 	}
-	if n == maxPacketSize {
+	if n > maxPacketSize {
 		return fmt.Errorf("Packet too big: %d bytes", n)
 	}
 
@@ -68,6 +68,7 @@ func readRequest(conn *net.UDPConn) error {
 
 	// Get filename
 	reader := bytes.NewBuffer(packet[2:])
+	// TODO: Remove trailing zero byte
 	filename, err := reader.ReadBytes(byte(0))
 	if err != nil {
 		return fmt.Errorf("Error reading filename: %v", err)
@@ -102,14 +103,21 @@ func readRequest(conn *net.UDPConn) error {
 // -----------------------------------------
 // | Opcode |  ErrorCode |   ErrMsg   |   0  |
 // -----------------------------------------
-func createErrorPacket(code uint16, message string) []byte {
+func createErrorPacket(code uint16, message string) ([]byte, error) {
 	packet := new(bytes.Buffer)
 	// Check for errors
-	binary.Write(packet, binary.BigEndian, OpERROR)
-	binary.Write(packet, binary.BigEndian, code)
-	binary.Write(packet, binary.BigEndian, []byte(message))
-	binary.Write(packet, binary.BigEndian, byte(0))
-	return packet.Bytes()
+	data := []interface{}{
+		OpERROR,
+		code,
+		[]byte(message),
+		byte(0),
+	}
+	for _, v := range data {
+		if err := binary.Write(packet, binary.BigEndian, v); err != nil {
+			return nil, err
+		}
+	}
+	return packet.Bytes(), nil
 }
 
 func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
@@ -137,9 +145,14 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	f, err := os.Create(filename)
 	if err != nil {
 		log.Println(err)
-		_, writeErr := conn.WriteToUDP(createErrorPacket(0, err.Error()), remoteAddress)
-		if writeErr != nil {
-			log.Println(writeErr)
+		errPacket, err := createErrorPacket(0, err.Error())
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		_, err = conn.WriteToUDP(errPacket, remoteAddress)
+		if err != nil {
+			log.Println(err)
 		}
 		return
 	}
@@ -187,7 +200,12 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 		packetTID := binary.BigEndian.Uint16(packet[2:4])
 		if packetTID != tid {
 			log.Println("Expected TID %d, got %d", tid, packetTID)
-			_, err := conn.WriteToUDP(createErrorPacket(5, "Unknown transfer id"), remoteAddress)
+			errPacket, err := createErrorPacket(5, "Unknown transfer id")
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			_, err = conn.WriteToUDP(errPacket, remoteAddress)
 			if err != nil {
 				log.Println(err)
 			}
@@ -201,7 +219,6 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 			return
 		}
 
-		// Check for write errors
 		err = writeAck(ack, tid)
 		if err != nil {
 			log.Println(err)
@@ -234,8 +251,8 @@ func main() {
 	}
 	defer conn.Close()
 
+	log.Println("Waiting for request")
 	for {
-		log.Println("Waiting for request")
 		err := readRequest(conn)
 		if err != nil {
 			log.Println(err)
