@@ -36,6 +36,12 @@ const (
 	maxPacketSize = blockSize * 2
 )
 
+type RequestPacket struct {
+	OpCode   OpCode
+	Mode     string
+	Filename string
+}
+
 func getOpCode(packet []byte) (OpCode, error) {
 	if len(packet) < 2 {
 		return OpERROR, fmt.Errorf("Packet too small to get opcode")
@@ -45,6 +51,38 @@ func getOpCode(packet []byte) (OpCode, error) {
 		return OpERROR, fmt.Errorf("Unknown opcode: %d", opcode)
 	}
 	return opcode, nil
+}
+
+func parseRequestPacket(packet []byte) (*RequestPacket, error) {
+	// Get opcode
+	opcode, err := getOpCode(packet)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get filename
+	reader := bytes.NewBuffer(packet[2:])
+
+	filename, err := reader.ReadBytes(byte(0))
+	if err != nil {
+		return nil, fmt.Errorf("Error reading filename: %v", err)
+	}
+	// Remove trailing 0
+	filename = filename[:len(filename)-1]
+
+	// Get mode
+	mode, err := reader.ReadBytes(byte(0))
+	if err != nil {
+		return nil, fmt.Errorf("Error reading mode: %v", err)
+	}
+	// Remove trailing 0
+	mode = mode[:len(mode)-1]
+
+	return &RequestPacket{
+		OpCode:   opcode,
+		Mode:     string(mode),
+		Filename: string(filename),
+	}, nil
 }
 
 func readRequest(conn *net.UDPConn) error {
@@ -59,43 +97,22 @@ func readRequest(conn *net.UDPConn) error {
 	}
 
 	log.Printf("Request from %v", remoteAddr)
-
-	// Get opcode
-	opcode, err := getOpCode(packet)
+	req, err := parseRequestPacket(packet)
 	if err != nil {
 		return err
 	}
 
-	// Get filename
-	reader := bytes.NewBuffer(packet[2:])
-
-	filename, err := reader.ReadBytes(byte(0))
-	if err != nil {
-		return fmt.Errorf("Error reading filename: %v", err)
-	}
-	// Remove trailing 0
-	filename = filename[:len(filename)-1]
-
-	// Get mode
-	mode, err := reader.ReadBytes(byte(0))
-	if err != nil {
-		return fmt.Errorf("Error reading mode: %v", err)
-	}
-	// Remove trailing 0
-	mode = mode[:len(mode)-1]
-
-	modeString := string(mode)
-	if modeString != "netascii" && modeString != "octet" {
-		return fmt.Errorf("Unknown mode: %v", string(mode))
+	if req.Mode != "netascii" && req.Mode != "octet" {
+		return fmt.Errorf("Unknown mode: %v", req.Mode)
 	}
 
-	switch opcode {
+	switch req.OpCode {
 	case OpRRQ:
-		go handleReadRequest(remoteAddr, string(filename))
+		go handleReadRequest(remoteAddr, req.Filename)
 	case OpWRQ:
-		go handleWriteRequest(remoteAddr, string(filename))
+		go handleWriteRequest(remoteAddr, req.Filename)
 	default:
-		log.Println("Unable to handle request with opcode: %d", opcode)
+		log.Println("Unable to handle request with opcode: %d", req.OpCode)
 	}
 
 	return nil
