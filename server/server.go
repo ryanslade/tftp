@@ -32,8 +32,8 @@ func (o OpCode) String() string {
 }
 
 const (
-	maxPacketSize = 2048
 	blockSize     = 512
+	maxPacketSize = blockSize * 2
 )
 
 func getOpCode(packet []byte) (OpCode, error) {
@@ -54,7 +54,7 @@ func readRequest(conn *net.UDPConn) error {
 	if err != nil {
 		return err
 	}
-	if n > maxPacketSize {
+	if n == maxPacketSize {
 		return fmt.Errorf("Packet too big: %d bytes", n)
 	}
 
@@ -68,28 +68,32 @@ func readRequest(conn *net.UDPConn) error {
 
 	// Get filename
 	reader := bytes.NewBuffer(packet[2:])
-	// TODO: Remove trailing zero byte
+
 	filename, err := reader.ReadBytes(byte(0))
 	if err != nil {
 		return fmt.Errorf("Error reading filename: %v", err)
 	}
+	// Remove trailing 0
+	filename = filename[:len(filename)-1]
 
 	// Get mode
 	mode, err := reader.ReadBytes(byte(0))
 	if err != nil {
 		return fmt.Errorf("Error reading mode: %v", err)
 	}
+	// Remove trailing 0
+	mode = mode[:len(mode)-1]
 
-	modeString := string(mode[:len(mode)-1])
+	modeString := string(mode)
 	if modeString != "netascii" && modeString != "octet" {
 		return fmt.Errorf("Unknown mode: %v", string(mode))
 	}
 
 	switch opcode {
 	case OpRRQ:
-		go handleReadRequest(remoteAddr, string(filename[:len(filename)-1]))
+		go handleReadRequest(remoteAddr, string(filename))
 	case OpWRQ:
-		go handleWriteRequest(remoteAddr, string(filename[:len(filename)-1]))
+		go handleWriteRequest(remoteAddr, string(filename))
 	default:
 		log.Println("Unable to handle request with opcode: %d", opcode)
 	}
