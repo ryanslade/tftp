@@ -53,6 +53,12 @@ func getOpCode(packet []byte) (OpCode, error) {
 	return opcode, nil
 }
 
+// parses a request packet in the form:
+//
+//  2 bytes     string    1 byte     string   1 byte
+// ------------------------------------------------
+// | Opcode |  Filename  |   0  |    Mode    |   0  |
+// ------------------------------------------------
 func parseRequestPacket(packet []byte) (*RequestPacket, error) {
 	// Get opcode
 	opcode, err := getOpCode(packet)
@@ -141,6 +147,12 @@ func createErrorPacket(code uint16, message string) ([]byte, error) {
 	return packet.Bytes(), nil
 }
 
+// writes an ack packet to the supplied byte slice
+//
+//  2 bytes     2 bytes
+//  ---------------------
+// | Opcode |   Block #  |
+//  ---------------------
 func writeAck(packet []byte, tid uint16) error {
 	if len(packet) != 4 {
 		return fmt.Errorf("Expected slice of length 4")
