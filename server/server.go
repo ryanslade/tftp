@@ -141,10 +141,6 @@ func createErrorPacket(code uint16, message string) ([]byte, error) {
 	return packet.Bytes(), nil
 }
 
-func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
-	log.Println("Handling RRQ")
-}
-
 func writeAck(packet []byte, tid uint16) error {
 	if len(packet) != 4 {
 		return fmt.Errorf("Expected slice of length 4")
@@ -154,8 +150,26 @@ func writeAck(packet []byte, tid uint16) error {
 	return nil
 }
 
+func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
+	log.Println("Handling RRQ")
+}
+
+func sendError(code uint16, message string, conn *net.UDPConn, remoteAddress *net.UDPAddr) {
+	errPacket, err := createErrorPacket(0, message)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	_, err = conn.WriteToUDP(errPacket, remoteAddress)
+	if err != nil {
+		log.Println(err)
+	}
+	return
+}
+
 func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	log.Println("Handling WRQ")
+
 	// Don't use DialUDP here, see https://groups.google.com/forum/#!topic/golang-nuts/Mb3MS9Khito
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
@@ -166,15 +180,8 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	f, err := os.Create(filename)
 	if err != nil {
 		log.Println(err)
-		errPacket, err := createErrorPacket(0, err.Error())
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		_, err = conn.WriteToUDP(errPacket, remoteAddress)
-		if err != nil {
-			log.Println(err)
-		}
+		// TODO: This error should indicate what went wrong
+		sendError(0, err.Error(), conn, remoteAddress)
 		return
 	}
 	defer f.Close()
@@ -183,7 +190,6 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 
 	// Acknowledge WRQ
 
-	// Check for write errors
 	ack := make([]byte, 4)
 	err = writeAck(ack, tid)
 	if err != nil {
@@ -221,15 +227,7 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 		packetTID := binary.BigEndian.Uint16(packet[2:4])
 		if packetTID != tid {
 			log.Println("Expected TID %d, got %d", tid, packetTID)
-			errPacket, err := createErrorPacket(5, "Unknown transfer id")
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			_, err = conn.WriteToUDP(errPacket, remoteAddress)
-			if err != nil {
-				log.Println(err)
-			}
+			sendError(5, "Unknown transfer id", conn, remoteAddress)
 			return
 		}
 
