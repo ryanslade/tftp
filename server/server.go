@@ -38,8 +38,8 @@ const (
 
 type RequestPacket struct {
 	OpCode   OpCode
-	Mode     string
 	Filename string
+	Mode     string
 }
 
 func getOpCode(packet []byte) (OpCode, error) {
@@ -109,7 +109,7 @@ func readRequest(conn *net.UDPConn) error {
 	}
 
 	if req.Mode != "netascii" && req.Mode != "octet" {
-		return fmt.Errorf("Unknown mode: %v", req.Mode)
+		return fmt.Errorf("Unknown mode: %s", req.Mode)
 	}
 
 	switch req.OpCode {
@@ -164,6 +164,24 @@ func writeAck(packet []byte, tid uint16) error {
 
 func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 	log.Println("Handling RRQ")
+
+	conn, err := net.ListenUDP("udp", nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		log.Println(err)
+		if os.IsNotExist(err) {
+			sendError(1, "File not found", conn, remoteAddress)
+			return
+		}
+		sendError(0, err.Error(), conn, remoteAddress)
+		return
+	}
+	defer f.Close()
 }
 
 func sendError(code uint16, message string, conn *net.UDPConn, remoteAddress *net.UDPAddr) {
