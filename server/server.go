@@ -199,14 +199,16 @@ func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 	}
 	defer f.Close()
 
-	packetNumber := uint16(1) // Starts at 1, not 0
+	var tid uint16
 	buffer := make([]byte, blockSize)
 	for {
+		tid++
+
 		n, err := f.Read(buffer)
 		if err == io.EOF {
 			break
 		}
-		packet, err := createDataPacket(packetNumber, buffer[:n])
+		packet, err := createDataPacket(tid, buffer[:n])
 		if err != nil {
 			log.Println(err)
 			sendError(0, err.Error(), conn, remoteAddress)
@@ -218,7 +220,6 @@ func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 			sendError(0, err.Error(), conn, remoteAddress)
 			break
 		}
-		packetNumber++
 	}
 }
 
@@ -306,12 +307,12 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 
 		ack, err := createAckPacket(tid)
 		if err != nil {
-			log.Println("Error creating ack packet:", err)
+			log.Println("Error creating ACK packet:", err)
 			return
 		}
 		_, err = conn.WriteToUDP(ack, remoteAddress)
 		if err != nil {
-			log.Println(err)
+			log.Println("Error writing ACK packet:", err)
 			return
 		}
 
