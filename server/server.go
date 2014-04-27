@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -91,7 +92,7 @@ func parseRequestPacket(packet []byte) (*RequestPacket, error) {
 	}, nil
 }
 
-func readRequest(conn *net.UDPConn) error {
+func handleHandshake(conn *net.UDPConn) error {
 	packet := make([]byte, maxPacketSize)
 
 	n, remoteAddr, err := conn.ReadFromUDP(packet)
@@ -132,7 +133,6 @@ func readRequest(conn *net.UDPConn) error {
 // -----------------------------------------
 func createErrorPacket(code uint16, message string) ([]byte, error) {
 	packet := new(bytes.Buffer)
-	// Check for errors
 	data := []interface{}{
 		OpERROR,
 		code,
@@ -140,6 +140,25 @@ func createErrorPacket(code uint16, message string) ([]byte, error) {
 		byte(0),
 	}
 	for _, v := range data {
+		if err := binary.Write(packet, binary.BigEndian, v); err != nil {
+			return nil, err
+		}
+	}
+	return packet.Bytes(), nil
+}
+
+//  2 bytes     2 bytes      n bytes
+//  ----------------------------------
+// | Opcode |   Block #  |   Data     |
+//  ----------------------------------
+func createDataPacket(blockNumber uint16, data []byte) ([]byte, error) {
+	packet := new(bytes.Buffer)
+	contents := []interface{}{
+		OpDATA,
+		blockNumber,
+		data,
+	}
+	for _, v := range contents {
 		if err := binary.Write(packet, binary.BigEndian, v); err != nil {
 			return nil, err
 		}
@@ -165,9 +184,12 @@ func writeAck(packet []byte, tid uint16) error {
 func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 	log.Println("Handling RRQ")
 
-	conn, err := net.ListenUDP("udp", nil)
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.IPv4zero,
+		Port: 0,
+	})
 	if err != nil {
-		log.Println(err)
+		log.Println("Error listening", err)
 		return
 	}
 
@@ -182,6 +204,28 @@ func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 		return
 	}
 	defer f.Close()
+
+	packetNumber := uint16(1) // Starts at 1, not 0
+	buffer := make([]byte, blockSize)
+	for {
+		n, err := f.Read(buffer)
+		if err == io.EOF {
+			break
+		}
+		packet, err := createDataPacket(packetNumber, buffer[:n])
+		if err != nil {
+			log.Println(err)
+			sendError(0, err.Error(), conn, remoteAddress)
+			break
+		}
+		n, err = conn.WriteToUDP(packet, remoteAddress)
+		if err != nil {
+			log.Println("Error writing data packet:", err)
+			sendError(0, err.Error(), conn, remoteAddress)
+			break
+		}
+		packetNumber++
+	}
 }
 
 func sendError(code uint16, message string, conn *net.UDPConn, remoteAddress *net.UDPAddr) {
@@ -192,7 +236,7 @@ func sendError(code uint16, message string, conn *net.UDPConn, remoteAddress *ne
 	}
 	_, err = conn.WriteToUDP(errPacket, remoteAddress)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error writing error packet:", err)
 	}
 	return
 }
@@ -302,7 +346,7 @@ func main() {
 
 	log.Println("Waiting for request")
 	for {
-		err := readRequest(conn)
+		err := handleHandshake(conn)
 		if err != nil {
 			log.Println(err)
 			continue
