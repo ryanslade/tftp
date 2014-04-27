@@ -125,20 +125,8 @@ func handleHandshake(conn *net.UDPConn) error {
 	return nil
 }
 
-// creates an error packet with the following structure:
-//
-// 2 bytes     2 bytes      string    1 byte
-// -----------------------------------------
-// | Opcode |  ErrorCode |   ErrMsg   |   0  |
-// -----------------------------------------
-func createErrorPacket(code uint16, message string) ([]byte, error) {
+func createPacket(data []interface{}) ([]byte, error) {
 	packet := new(bytes.Buffer)
-	data := []interface{}{
-		OpERROR,
-		code,
-		[]byte(message),
-		byte(0),
-	}
 	for _, v := range data {
 		if err := binary.Write(packet, binary.BigEndian, v); err != nil {
 			return nil, err
@@ -147,23 +135,31 @@ func createErrorPacket(code uint16, message string) ([]byte, error) {
 	return packet.Bytes(), nil
 }
 
+// creates an error packet with the following structure:
+//
+// 2 bytes     2 bytes      string    1 byte
+// -----------------------------------------
+// | Opcode |  ErrorCode |   ErrMsg   |   0  |
+// -----------------------------------------
+func createErrorPacket(code uint16, message string) ([]byte, error) {
+	return createPacket([]interface{}{
+		OpERROR,
+		code,
+		[]byte(message),
+		byte(0),
+	})
+}
+
 //  2 bytes     2 bytes      n bytes
 //  ----------------------------------
 // | Opcode |   Block #  |   Data     |
 //  ----------------------------------
 func createDataPacket(blockNumber uint16, data []byte) ([]byte, error) {
-	packet := new(bytes.Buffer)
-	contents := []interface{}{
+	return createPacket([]interface{}{
 		OpDATA,
 		blockNumber,
 		data,
-	}
-	for _, v := range contents {
-		if err := binary.Write(packet, binary.BigEndian, v); err != nil {
-			return nil, err
-		}
-	}
-	return packet.Bytes(), nil
+	})
 }
 
 // writes an ack packet to the supplied byte slice
@@ -172,13 +168,11 @@ func createDataPacket(blockNumber uint16, data []byte) ([]byte, error) {
 //  ---------------------
 // | Opcode |   Block #  |
 //  ---------------------
-func writeAck(packet []byte, tid uint16) error {
-	if len(packet) != 4 {
-		return fmt.Errorf("Expected slice of length 4")
-	}
-	binary.BigEndian.PutUint16(packet, uint16(OpACK))
-	binary.BigEndian.PutUint16(packet[2:4], tid)
-	return nil
+func createAckPacket(tid uint16) ([]byte, error) {
+	return createPacket([]interface{}{
+		OpACK,
+		tid,
+	})
 }
 
 func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
@@ -263,11 +257,9 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	tid := uint16(0)
 
 	// Acknowledge WRQ
-
-	ack := make([]byte, 4)
-	err = writeAck(ack, tid)
+	ack, err := createAckPacket(tid)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error creating ack packet", err)
 		return
 	}
 	_, err = conn.WriteToUDP(ack, remoteAddress)
@@ -312,9 +304,9 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 			return
 		}
 
-		err = writeAck(ack, tid)
+		ack, err := createAckPacket(tid)
 		if err != nil {
-			log.Println(err)
+			log.Println("Error creating ack packet:", err)
 			return
 		}
 		_, err = conn.WriteToUDP(ack, remoteAddress)
