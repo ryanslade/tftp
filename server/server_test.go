@@ -18,19 +18,3 @@ func TestCreateErrorPacket(t *testing.T) {
 		t.Errorf("%v", p)
 	}
 }
-
-func TestWriteAck(t *testing.T) {
-	s := make([]byte, 4)
-	err := writeAck(s, 257)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	expected := []byte{0, 4, 1, 1}
-	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Expected")
-		t.Errorf("%v", expected)
-		t.Errorf("Got")
-		t.Errorf("%v", s)
-	}
-}
