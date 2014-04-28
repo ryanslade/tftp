@@ -98,10 +98,10 @@ func parseRequestPacket(packet []byte) (*RequestPacket, error) {
 	}, nil
 }
 
-func handleHandshake(conn *net.UDPConn) error {
+func handleHandshake(conn net.PacketConn) error {
 	packet := make([]byte, maxPacketSize)
 
-	n, remoteAddr, err := conn.ReadFromUDP(packet)
+	n, remoteAddr, err := conn.ReadFrom(packet)
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func createAckPacket(tid uint16) ([]byte, error) {
 	})
 }
 
-func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
+func handleReadRequest(remoteAddress net.Addr, filename string) {
 	log.Println("Handling RRQ")
 
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{
@@ -220,7 +220,7 @@ func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 			sendError(0, err.Error(), conn, remoteAddress)
 			break
 		}
-		n, err = conn.WriteToUDP(packet, remoteAddress)
+		n, err = conn.WriteTo(packet, remoteAddress)
 		if err != nil {
 			log.Println("Error writing data packet:", err)
 			sendError(0, err.Error(), conn, remoteAddress)
@@ -229,20 +229,20 @@ func handleReadRequest(remoteAddress *net.UDPAddr, filename string) {
 	}
 }
 
-func sendError(code uint16, message string, conn *net.UDPConn, remoteAddress *net.UDPAddr) {
+func sendError(code uint16, message string, conn net.PacketConn, remoteAddress net.Addr) {
 	errPacket, err := createErrorPacket(0, message)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	_, err = conn.WriteToUDP(errPacket, remoteAddress)
+	_, err = conn.WriteTo(errPacket, remoteAddress)
 	if err != nil {
 		log.Println("Error writing error packet:", err)
 	}
 	return
 }
 
-func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
+func handleWriteRequest(remoteAddress net.Addr, filename string) {
 	log.Println("Handling WRQ")
 
 	// Don't use DialUDP here, see https://groups.google.com/forum/#!topic/golang-nuts/Mb3MS9Khito
@@ -269,7 +269,7 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 		log.Println("Error creating ack packet", err)
 		return
 	}
-	_, err = conn.WriteToUDP(ack, remoteAddress)
+	_, err = conn.WriteTo(ack, remoteAddress)
 	if err != nil {
 		log.Println(err)
 		return
@@ -316,7 +316,7 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 			log.Println("Error creating ACK packet:", err)
 			return
 		}
-		_, err = conn.WriteToUDP(ack, remoteAddress)
+		_, err = conn.WriteTo(ack, remoteAddress)
 		if err != nil {
 			log.Println("Error writing ACK packet:", err)
 			return
