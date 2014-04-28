@@ -3,11 +3,17 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+)
+
+// Flags
+var (
+	port int
 )
 
 type OpCode uint16
@@ -324,8 +330,14 @@ func handleWriteRequest(remoteAddress *net.UDPAddr, filename string) {
 	}
 }
 
+func init() {
+	flag.IntVar(&port, "port", 69, "Port to listen on")
+}
+
 func main() {
-	addr, err := net.ResolveUDPAddr("udp", ":4567")
+	flag.Parse()
+
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Println(err)
 		return
@@ -337,7 +349,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	log.Println("Waiting for request")
+	log.Println("Waiting for requests on port", port)
 	for {
 		err := handleHandshake(conn)
 		if err != nil {
