@@ -43,6 +43,11 @@ const (
 	maxPacketSize = blockSize * 2
 )
 
+var acceptedModes = map[string]bool{
+	"netascii": true,
+	"octet":    true,
+}
+
 type RequestPacket struct {
 	OpCode   OpCode
 	Filename string
@@ -115,7 +120,7 @@ func handleHandshake(conn net.PacketConn) error {
 		return err
 	}
 
-	if req.Mode != "netascii" && req.Mode != "octet" {
+	if !acceptedModes[req.Mode] {
 		return fmt.Errorf("Unknown mode: %s", req.Mode)
 	}
 
