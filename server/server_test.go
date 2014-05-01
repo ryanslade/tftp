@@ -5,6 +5,81 @@ import (
 	"testing"
 )
 
+func TestParseRequestPacket(t *testing.T) {
+	testCases := []struct {
+		packet         []byte
+		expectedPacket *RequestPacket
+		shouldError    bool
+	}{
+		// Nil packet
+		{
+			packet:         nil,
+			expectedPacket: nil,
+			shouldError:    true,
+		},
+		// Empty packet
+		{
+			packet:         []byte{},
+			expectedPacket: nil,
+			shouldError:    true,
+		},
+		// RRQ
+		{
+			packet: []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'M', 'o', 'd', 'e', 0},
+			expectedPacket: &RequestPacket{
+				OpCode:   OpRRQ,
+				Filename: "Hello",
+				Mode:     "Mode",
+			},
+			shouldError: false,
+		},
+		// WRQ
+		{
+			packet: []byte{0, 2, 66, 0, 66, 0},
+			expectedPacket: &RequestPacket{
+				OpCode:   OpWRQ,
+				Filename: "B",
+				Mode:     "B",
+			},
+			shouldError: false,
+		},
+		// Invalid name
+		{
+			packet:         []byte{0, 1, 'H', 'e', 'l', 'l', 'o'},
+			expectedPacket: nil,
+			shouldError:    true,
+		},
+		// Invalid mode
+		{
+			packet:         []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'A'},
+			expectedPacket: nil,
+			shouldError:    true,
+		},
+		// Invalid opcode
+		{
+			packet:         []byte{1, 1, 'H', 'e', 'l', 'l', 'o'},
+			expectedPacket: nil,
+			shouldError:    true,
+		},
+	}
+
+	for i, tc := range testCases {
+		packet, err := parseRequestPacket(tc.packet)
+		if tc.shouldError && err == nil {
+			t.Errorf("Expected error, didn't get one (%d)", i)
+		}
+		if !tc.shouldError && err != nil {
+			t.Errorf("%v (%d)", err)
+		}
+		if !reflect.DeepEqual(tc.expectedPacket, packet) {
+			t.Errorf("Expected")
+			t.Errorf("%v", tc.expectedPacket)
+			t.Errorf("Got")
+			t.Errorf("%v", packet)
+		}
+	}
+}
+
 func TestCreateErrorPacket(t *testing.T) {
 	p, err := createErrorPacket(2, "Hello")
 	if err != nil {
