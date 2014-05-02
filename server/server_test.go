@@ -9,7 +9,15 @@ import (
 	"time"
 )
 
-var _ net.PacketConn = &mockPacketConn{}
+type mockAddr struct{}
+
+func (m mockAddr) Network() string {
+	return "udp"
+}
+
+func (m mockAddr) String() string {
+	return "mockAddr"
+}
 
 type mockPacketConn struct {
 	data *bytes.Buffer
@@ -18,6 +26,7 @@ type mockPacketConn struct {
 
 func (m *mockPacketConn) ReadFrom(b []byte) (n int, add net.Addr, err error) {
 	to := bytes.NewBuffer(b)
+	to.Truncate(0)
 	n64, err := io.Copy(to, m.data)
 	return int(n64), m.addr, err
 }
@@ -49,10 +58,24 @@ func (m *mockPacketConn) SetWriteDeadline(t time.Time) error {
 }
 
 func sampleRRQ() []byte {
-	return []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'M', 'o', 'd', 'e', 0}
+	return []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
 }
 
 func TestHandleHandshakeWithRRQ(t *testing.T) {
+	conn := &mockPacketConn{
+		data: &bytes.Buffer{},
+		addr: mockAddr{},
+	}
+
+	_, err := conn.data.Write(sampleRRQ())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = handleHandshake(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestParseRequestPacket(t *testing.T) {
