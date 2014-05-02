@@ -54,6 +54,10 @@ type RequestPacket struct {
 	Mode     string
 }
 
+type requestHander interface {
+	serve(remoteAddr net.Addr, filename string)
+}
+
 func getOpCode(packet []byte) (OpCode, error) {
 	if len(packet) < 2 {
 		return OpERROR, fmt.Errorf("Packet too small to get opcode")

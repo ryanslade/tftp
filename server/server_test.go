@@ -1,9 +1,59 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"net"
 	"reflect"
 	"testing"
+	"time"
 )
+
+var _ net.PacketConn = &mockPacketConn{}
+
+type mockPacketConn struct {
+	data *bytes.Buffer
+	addr net.Addr
+}
+
+func (m *mockPacketConn) ReadFrom(b []byte) (n int, add net.Addr, err error) {
+	to := bytes.NewBuffer(b)
+	n64, err := io.Copy(to, m.data)
+	return int(n64), m.addr, err
+}
+
+func (m *mockPacketConn) WriteTo(b []byte, add net.Addr) (n int, err error) {
+	from := bytes.NewReader(b)
+	n64, err := io.Copy(m.data, from)
+	return int(n64), err
+}
+
+func (m *mockPacketConn) Close() error {
+	return nil
+}
+
+func (m *mockPacketConn) LocalAddr() net.Addr {
+	return m.addr
+}
+
+func (m *mockPacketConn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (m *mockPacketConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (m *mockPacketConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func sampleRRQ() []byte {
+	return []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'M', 'o', 'd', 'e', 0}
+}
+
+func TestHandleHandshakeWithRRQ(t *testing.T) {
+}
 
 func TestParseRequestPacket(t *testing.T) {
 	testCases := []struct {
