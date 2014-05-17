@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+type mockHandler struct {
+	replyChan chan struct{}
+}
+
+func (m *mockHandler) serve(remoteAddr net.Addr, filename string) {
+	m.replyChan <- struct{}{}
+}
+
 type mockAddr struct{}
 
 func (m mockAddr) Network() string {

@@ -6,51 +6,86 @@ import (
 	"log"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func init() {
 	log.SetOutput(ioutil.Discard)
+	handlerMapping = map[OpCode]requestHandler{}
 }
 
 func sampleRRQ() []byte {
-	return []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
+	return []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 'R', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
 }
 
 func sampleWRQ() []byte {
-	return []byte{0, 2, 'H', 'e', 'l', 'l', 'o', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
+	return []byte{0, 2, 'H', 'e', 'l', 'l', 'o', 'W', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
 }
 
-func TestHandleHandshakeWithRRQ(t *testing.T) {
-	conn := &mockPacketConn{
-		data: &bytes.Buffer{},
-		addr: mockAddr{},
+// Make sure the correct handler is called
+func TestHandleHandshake(t *testing.T) {
+	testCases := []struct {
+		opCode           OpCode
+		req              []byte
+		expectedFileName string
+	}{
+		{
+			opCode:           OpRRQ,
+			req:              sampleRRQ(),
+			expectedFileName: "HelloR",
+		},
+		{
+			opCode:           OpWRQ,
+			req:              sampleWRQ(),
+			expectedFileName: "HelloW",
+		},
 	}
 
-	_, err := conn.data.Write(sampleRRQ())
-	if err != nil {
-		t.Fatal(err)
+	rChan := make(chan struct{})
+	mockRRQHandler := &mockHandler{
+		replyChan: rChan,
 	}
 
-	err = handleHandshake(conn)
-	if err != nil {
-		t.Fatal(err)
+	wChan := make(chan struct{})
+	mockWRQHandler := &mockHandler{
+		replyChan: wChan,
 	}
-}
+	handlerMapping[OpRRQ] = mockRRQHandler
+	handlerMapping[OpWRQ] = mockWRQHandler
 
-func TestHandleHandshakeWithWRQ(t *testing.T) {
-	conn := &mockPacketConn{
-		data: &bytes.Buffer{},
-		addr: mockAddr{},
-	}
+	for i, tc := range testCases {
+		conn := &mockPacketConn{
+			data: &bytes.Buffer{},
+			addr: mockAddr{},
+		}
 
-	_, err := conn.data.Write(sampleWRQ())
-	if err != nil {
-		t.Fatal(err)
-	}
+		_, err := conn.data.Write(tc.req)
+		if err != nil {
+			t.Log(i)
+			t.Fatal(err)
+		}
 
-	err = handleHandshake(conn)
-	if err != nil {
-		t.Fatal(err)
+		err = handleHandshake(conn)
+		if err != nil {
+			t.Log(i)
+			t.Fatal(err)
+		}
+
+		// Wait for the replyChan in the mock since the handler is spawned
+		// in another goroutine
+		var waitChan chan struct{}
+		switch tc.opCode {
+		case OpRRQ:
+			waitChan = rChan
+		case OpWRQ:
+			waitChan = wChan
+		}
+		select {
+		case <-waitChan:
+			// All good
+		case <-time.After(1 * time.Millisecond):
+			t.Errorf("Didn't receive, handler not called (%d)", i)
+		}
 	}
 }
 
