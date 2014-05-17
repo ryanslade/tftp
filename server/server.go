@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 )
 
 // Flags
@@ -42,11 +43,6 @@ const (
 	blockSize     = 512
 	maxPacketSize = blockSize * 2
 )
-
-var acceptedModes = map[string]bool{
-	"netascii": true,
-	"octet":    true,
-}
 
 type RequestPacket struct {
 	OpCode   OpCode
@@ -118,6 +114,14 @@ func parseRequestPacket(packet []byte) (*RequestPacket, error) {
 	}, nil
 }
 
+func acceptedMode(mode string) bool {
+	switch strings.ToLower(mode) {
+	case "netascii", "octet", "mail":
+		return true
+	}
+	return false
+}
+
 func handleHandshake(conn net.PacketConn) error {
 	packet := make([]byte, maxPacketSize)
 
@@ -135,7 +139,7 @@ func handleHandshake(conn net.PacketConn) error {
 		return fmt.Errorf("Error parsing request packet: %v", err)
 	}
 
-	if !acceptedModes[req.Mode] {
+	if !acceptedMode(req.Mode) {
 		return fmt.Errorf("Unknown mode: %s", req.Mode)
 	}
 

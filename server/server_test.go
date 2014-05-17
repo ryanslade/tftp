@@ -22,6 +22,35 @@ func sampleWRQ() []byte {
 	return []byte{0, 2, 'H', 'e', 'l', 'l', 'o', 'W', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
 }
 
+func TestAcceptedMode(t *testing.T) {
+	testCases := []struct {
+		mode     string
+		accepted bool
+	}{
+		// Three accepted modes
+		{mode: "netascii", accepted: true},
+		{mode: "octet", accepted: true},
+		{mode: "mail", accepted: true},
+
+		// Mixed case should be allowed
+		{mode: "netAscii", accepted: true},
+		{mode: "OcteT", accepted: true},
+		{mode: "Mail", accepted: true},
+
+		// Anything else should be rejected
+		{mode: "", accepted: false},
+		{mode: "mode", accepted: false},
+		{mode: "blah", accepted: false},
+	}
+
+	for _, tc := range testCases {
+		outcome := acceptedMode(tc.mode)
+		if outcome != tc.accepted {
+			t.Errorf("Expected mode, '%s' accepted = %v", tc.mode, tc.accepted)
+		}
+	}
+}
+
 // Make sure the correct handler is called
 func TestHandleHandshake(t *testing.T) {
 	testCases := []struct {
