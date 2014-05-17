@@ -84,6 +84,23 @@ func TestHandleHandshakeWithRRQ(t *testing.T) {
 	}
 }
 
+func TestHandleHandshakeWithWRQ(t *testing.T) {
+	conn := &mockPacketConn{
+		data: &bytes.Buffer{},
+		addr: mockAddr{},
+	}
+
+	_, err := conn.data.Write(sampleWRQ())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = handleHandshake(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestParseRequestPacket(t *testing.T) {
 	testCases := []struct {
 		packet         []byte
