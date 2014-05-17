@@ -3,11 +3,17 @@ package main
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
+	"log"
 	"net"
 	"reflect"
 	"testing"
 	"time"
 )
+
+func init() {
+	log.SetOutput(ioutil.Discard)
+}
 
 type mockAddr struct{}
 
