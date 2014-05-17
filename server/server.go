@@ -145,7 +145,7 @@ func handleHandshake(conn net.PacketConn) error {
 
 	handler, ok := handlerMapping[req.OpCode]
 	if !ok {
-		log.Println("No handler for opCode: %d", req.OpCode)
+		log.Printf("No handler for opCode: %d\n", req.OpCode)
 	}
 	go handler.serve(remoteAddr, req.Filename)
 
@@ -314,13 +314,13 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 			return
 		}
 		if opcode != OpDATA {
-			log.Println("Expected DATA packet, got %v", opcode)
+			log.Printf("Expected DATA packet, got %v\n", opcode)
 			return
 		}
 
 		packetTID := binary.BigEndian.Uint16(packet[2:4])
 		if packetTID != tid {
-			log.Println("Expected TID %d, got %d", tid, packetTID)
+			log.Printf("Expected TID %d, got %d\n", tid, packetTID)
 			sendError(5, "Unknown transfer id", conn, remoteAddress)
 			return
 		}

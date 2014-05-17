@@ -182,7 +182,7 @@ func TestParseRequestPacket(t *testing.T) {
 			t.Errorf("Expected error, didn't get one (%d)", i)
 		}
 		if !tc.shouldError && err != nil {
-			t.Errorf("%v (%d)", err)
+			t.Errorf("%v (%d)", err, i)
 		}
 		if !reflect.DeepEqual(tc.expectedPacket, packet) {
 			t.Errorf("Expected")
@@ -252,7 +252,7 @@ func TestGetOpcode(t *testing.T) {
 			continue
 		}
 		if !tc.shouldError && err != nil {
-			t.Errorf("%v (%d)", err)
+			t.Errorf("%v (%d)", err, i)
 			continue
 		}
 		if oc != tc.expectedOpcode {
