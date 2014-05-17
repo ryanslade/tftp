@@ -54,8 +54,19 @@ type RequestPacket struct {
 	Mode     string
 }
 
-type requestHander interface {
+type requestHandler interface {
 	serve(remoteAddr net.Addr, filename string)
+}
+
+type requestHandlerFunc func(remoteAddr net.Addr, filename string)
+
+func (r requestHandlerFunc) serve(remoteAddr net.Addr, filename string) {
+	r(remoteAddr, filename)
+}
+
+var handlerMapping = map[OpCode]requestHandler{
+	OpRRQ: requestHandlerFunc(handleReadRequest),
+	OpWRQ: requestHandlerFunc(handleWriteRequest),
 }
 
 func getOpCode(packet []byte) (OpCode, error) {
@@ -128,14 +139,11 @@ func handleHandshake(conn net.PacketConn) error {
 		return fmt.Errorf("Unknown mode: %s", req.Mode)
 	}
 
-	switch req.OpCode {
-	case OpRRQ:
-		go handleReadRequest(remoteAddr, req.Filename)
-	case OpWRQ:
-		go handleWriteRequest(remoteAddr, req.Filename)
-	default:
-		log.Println("Unable to handle request with opcode: %d", req.OpCode)
+	handler, ok := handlerMapping[req.OpCode]
+	if !ok {
+		log.Println("No handler for opCode: %d", req.OpCode)
 	}
+	go handler.serve(remoteAddr, req.Filename)
 
 	return nil
 }

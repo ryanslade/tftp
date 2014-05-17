@@ -67,6 +67,10 @@ func sampleRRQ() []byte {
 	return []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
 }
 
+func sampleWRQ() []byte {
+	return []byte{0, 2, 'H', 'e', 'l', 'l', 'o', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
+}
+
 func TestHandleHandshakeWithRRQ(t *testing.T) {
 	conn := &mockPacketConn{
 		data: &bytes.Buffer{},
