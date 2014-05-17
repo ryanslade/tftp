@@ -145,7 +145,7 @@ func handleHandshake(conn net.PacketConn) error {
 
 	handler, ok := handlerMapping[req.OpCode]
 	if !ok {
-		log.Printf("No handler for opCode: %d\n", req.OpCode)
+		log.Printf("No handler for OpCode: %d\n", req.OpCode)
 	}
 	go handler.serve(remoteAddr, req.Filename)
 

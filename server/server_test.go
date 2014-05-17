@@ -260,3 +260,15 @@ func TestGetOpcode(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkCreateErrorPacket(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		packet, err := createErrorPacket(1, "Error")
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(packet) == 0 {
+			b.Fatal("Packet is empty")
+		}
+	}
+}
