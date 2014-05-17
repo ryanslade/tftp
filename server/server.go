@@ -112,7 +112,7 @@ func handleHandshake(conn net.PacketConn) error {
 
 	n, remoteAddr, err := conn.ReadFrom(packet)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error reading from connection: %v", err)
 	}
 	if n == maxPacketSize {
 		return fmt.Errorf("Packet too big: %d bytes", n)
@@ -121,7 +121,7 @@ func handleHandshake(conn net.PacketConn) error {
 	log.Printf("Request from %v", remoteAddr)
 	req, err := parseRequestPacket(packet)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error parsing request packet: %v", err)
 	}
 
 	if !acceptedModes[req.Mode] {
