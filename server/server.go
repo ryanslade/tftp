@@ -256,7 +256,7 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 			break
 		}
 		if i != 4 {
-			log.Println("Expected 4 bytes read for ACK packet, got %d", i)
+			log.Println("Expected 4 bytes read for ACK packet, got", i)
 			break
 		}
 		ackTid, err := parseAckPacket(ackBuf)
