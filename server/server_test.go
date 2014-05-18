@@ -14,6 +14,45 @@ func init() {
 	handlerMapping = map[OpCode]requestHandler{}
 }
 
+func TestParseACKPacket(t *testing.T) {
+	testCases := []struct {
+		packet      []byte
+		tid         uint16
+		errExpected bool
+	}{
+		// Valid packet
+		{
+			packet:      []byte{0, 4, 0, 1},
+			tid:         1,
+			errExpected: false,
+		},
+		// Wrong opcode
+		{
+			packet:      []byte{0, 3, 0, 1},
+			tid:         1,
+			errExpected: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		tid, err := parseAckPacket(tc.packet)
+		if tc.errExpected && err == nil {
+			t.Errorf("Expected an error, got nil (%d)", i)
+			continue
+		}
+		if !tc.errExpected && err != nil {
+			t.Errorf("Error: %v (%d)", err, i)
+			continue
+		}
+		if tc.errExpected && err != nil {
+			continue
+		}
+		if tid != tc.tid {
+			t.Errorf("Expected tid: %d, got %d (%d)", tc.tid, tid, i)
+		}
+	}
+}
+
 func sampleRRQ() []byte {
 	return []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 'R', 0, 'n', 'e', 't', 'a', 's', 'c', 'i', 'i', 0}
 }

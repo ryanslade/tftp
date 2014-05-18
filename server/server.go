@@ -192,6 +192,15 @@ func createAckPacket(tid uint16) []byte {
 	return buf
 }
 
+func parseAckPacket(packet []byte) (tid uint16, err error) {
+	op := binary.BigEndian.Uint16(packet)
+	if OpCode(op) != OpACK {
+		return 0, fmt.Errorf("Expected ACK packet, got OpCode: %d", op)
+	}
+	tid = binary.BigEndian.Uint16(packet[2:])
+	return tid, nil
+}
+
 func handleReadRequest(remoteAddress net.Addr, filename string) {
 	log.Println("Handling RRQ")
 
@@ -218,18 +227,45 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 
 	var tid uint16
 	buffer := make([]byte, blockSize)
+	ackBuf := make([]byte, 4)
 	for {
 		tid++
 
 		n, err := f.Read(buffer)
 		if err == io.EOF {
+			log.Println("Done sending", filename)
 			break
 		}
+		if err != nil {
+			log.Println("Error reading file:", err)
+			break
+		}
+
 		packet := createDataPacket(tid, buffer[:n])
 		n, err = conn.WriteTo(packet, remoteAddress)
 		if err != nil {
 			log.Println("Error writing data packet:", err)
 			sendError(0, err.Error(), conn, remoteAddress)
+			break
+		}
+
+		// Read ack
+		i, _, err := conn.ReadFrom(ackBuf)
+		if err != nil {
+			log.Println("Error reading ACK packet:", err)
+			break
+		}
+		if i != 4 {
+			log.Println("Expected 4 bytes read for ACK packet, got %d", i)
+			break
+		}
+		ackTid, err := parseAckPacket(ackBuf)
+		if err != nil {
+			log.Println("Error parsing ACK packet:", err)
+			break
+		}
+		if ackTid != tid {
+			log.Printf("ACK tid: %d, does not match expected: %d", ackTid, tid)
 			break
 		}
 	}
@@ -302,7 +338,8 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 			return
 		}
 
-		// Write data
+		// TODO: Wrap file io in a buffered writer?
+		// Write data to disk
 		_, err = f.Write(packet[4:n])
 		if err != nil {
 			log.Println(err)
