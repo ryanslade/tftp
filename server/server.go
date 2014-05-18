@@ -152,41 +152,31 @@ func handleHandshake(conn net.PacketConn) error {
 	return nil
 }
 
-func createPacket(data []interface{}) ([]byte, error) {
-	packet := new(bytes.Buffer)
-	for _, v := range data {
-		if err := binary.Write(packet, binary.BigEndian, v); err != nil {
-			return nil, err
-		}
-	}
-	return packet.Bytes(), nil
-}
-
 // creates an error packet with the following structure:
 //
 // 2 bytes     2 bytes      string    1 byte
 // -----------------------------------------
 // | Opcode |  ErrorCode |   ErrMsg   |   0  |
 // -----------------------------------------
-func createErrorPacket(code uint16, message string) ([]byte, error) {
-	return createPacket([]interface{}{
-		OpERROR,
-		code,
-		[]byte(message),
-		byte(0),
-	})
+func createErrorPacket(code uint16, message string) []byte {
+	buf := make([]byte, 2+2+len(message)+1)
+	binary.BigEndian.PutUint16(buf, uint16(OpERROR)) // 2 bytes
+	binary.BigEndian.PutUint16(buf[2:], code)        // 2 bytes
+	copy(buf[4:], []byte(message))
+	buf[len(buf)-1] = byte(0)
+	return buf
 }
 
 //  2 bytes     2 bytes      n bytes
 //  ----------------------------------
 // | Opcode |   Block #  |   Data     |
 //  ----------------------------------
-func createDataPacket(blockNumber uint16, data []byte) ([]byte, error) {
-	return createPacket([]interface{}{
-		OpDATA,
-		blockNumber,
-		data,
-	})
+func createDataPacket(blockNumber uint16, data []byte) []byte {
+	buf := make([]byte, 2+2+len(data))
+	binary.BigEndian.PutUint16(buf, uint16(OpDATA))
+	binary.BigEndian.PutUint16(buf[2:], blockNumber)
+	copy(buf[4:], data)
+	return buf
 }
 
 // writes an ack packet to the supplied byte slice
@@ -195,11 +185,11 @@ func createDataPacket(blockNumber uint16, data []byte) ([]byte, error) {
 //  ---------------------
 // | Opcode |   Block #  |
 //  ---------------------
-func createAckPacket(tid uint16) ([]byte, error) {
-	return createPacket([]interface{}{
-		OpACK,
-		tid,
-	})
+func createAckPacket(tid uint16) []byte {
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint16(buf, uint16(OpACK))
+	binary.BigEndian.PutUint16(buf[2:], tid)
+	return buf
 }
 
 func handleReadRequest(remoteAddress net.Addr, filename string) {
@@ -235,12 +225,7 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 		if err == io.EOF {
 			break
 		}
-		packet, err := createDataPacket(tid, buffer[:n])
-		if err != nil {
-			log.Println(err)
-			sendError(0, err.Error(), conn, remoteAddress)
-			break
-		}
+		packet := createDataPacket(tid, buffer[:n])
 		n, err = conn.WriteTo(packet, remoteAddress)
 		if err != nil {
 			log.Println("Error writing data packet:", err)
@@ -251,12 +236,8 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 }
 
 func sendError(code uint16, message string, conn net.PacketConn, remoteAddress net.Addr) {
-	errPacket, err := createErrorPacket(0, message)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	_, err = conn.WriteTo(errPacket, remoteAddress)
+	errPacket := createErrorPacket(0, message)
+	_, err := conn.WriteTo(errPacket, remoteAddress)
 	if err != nil {
 		log.Println("Error writing error packet:", err)
 	}
@@ -285,11 +266,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 	tid := uint16(0)
 
 	// Acknowledge WRQ
-	ack, err := createAckPacket(tid)
-	if err != nil {
-		log.Println("Error creating ack packet", err)
-		return
-	}
+	ack := createAckPacket(tid)
 	_, err = conn.WriteTo(ack, remoteAddress)
 	if err != nil {
 		log.Println(err)
@@ -332,11 +309,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 			return
 		}
 
-		ack, err := createAckPacket(tid)
-		if err != nil {
-			log.Println("Error creating ACK packet:", err)
-			return
-		}
+		ack := createAckPacket(tid)
 		_, err = conn.WriteTo(ack, remoteAddress)
 		if err != nil {
 			log.Println("Error writing ACK packet:", err)

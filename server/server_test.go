@@ -194,10 +194,7 @@ func TestParseRequestPacket(t *testing.T) {
 }
 
 func TestCreateErrorPacket(t *testing.T) {
-	p, err := createErrorPacket(2, "Hello")
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createErrorPacket(2, "Hello")
 	expected := []byte{0, 5, 0, 2, 72, 101, 108, 108, 111, 0}
 	if !reflect.DeepEqual(p, expected) {
 		t.Errorf("Expected")
@@ -263,10 +260,7 @@ func TestGetOpcode(t *testing.T) {
 
 func BenchmarkCreateErrorPacket(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		packet, err := createErrorPacket(1, "Error")
-		if err != nil {
-			b.Fatal(err)
-		}
+		packet := createErrorPacket(1, "Error")
 		if len(packet) == 0 {
 			b.Fatal("Packet is empty")
 		}
