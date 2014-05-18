@@ -36,6 +36,30 @@ func TestCreateDataPacket(t *testing.T) {
 	}
 }
 
+func TestCreateAckPacket(t *testing.T) {
+	testCases := []struct {
+		tid      uint16
+		expected []byte
+	}{
+		{
+			tid:      1,
+			expected: []byte{0, 4, 0, 1},
+		},
+		{
+			tid:      14,
+			expected: []byte{0, 4, 0, 14},
+		},
+	}
+
+	for i, tc := range testCases {
+		packet := createAckPacket(tc.tid)
+		if !reflect.DeepEqual(packet, tc.expected) {
+			t.Errorf("Expected and actual packet not equal (%d)", i)
+			t.Error(packet)
+		}
+	}
+}
+
 func TestParseACKPacket(t *testing.T) {
 	testCases := []struct {
 		packet      []byte
