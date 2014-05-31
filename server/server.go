@@ -192,9 +192,16 @@ func createAckPacket(tid uint16) []byte {
 	return buf
 }
 
+//  2 bytes     2 bytes
+//  ---------------------
+// | Opcode |   Block #  |
+//  ---------------------
 func parseAckPacket(packet []byte) (tid uint16, err error) {
-	op := binary.BigEndian.Uint16(packet)
-	if OpCode(op) != OpACK {
+	op, err := getOpCode(packet)
+	if err != nil {
+		return 0, fmt.Errorf("Error getting opcode: %v", err)
+	}
+	if op != OpACK {
 		return 0, fmt.Errorf("Expected ACK packet, got OpCode: %d", op)
 	}
 	tid = binary.BigEndian.Uint16(packet[2:])
