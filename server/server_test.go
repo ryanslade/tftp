@@ -7,11 +7,13 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ryanslade/tftp/common"
 )
 
 func init() {
 	log.SetOutput(ioutil.Discard)
-	handlerMapping = map[OpCode]requestHandler{}
+	handlerMapping = map[common.OpCode]requestHandler{}
 }
 
 func TestCreateDataPacket(t *testing.T) {
@@ -139,17 +141,17 @@ func TestAcceptedMode(t *testing.T) {
 // Make sure the correct handler is called
 func TestHandleHandshake(t *testing.T) {
 	testCases := []struct {
-		opCode           OpCode
+		opCode           common.OpCode
 		req              []byte
 		expectedFileName string
 	}{
 		{
-			opCode:           OpRRQ,
+			opCode:           common.OpRRQ,
 			req:              sampleRRQ(),
 			expectedFileName: "HelloR",
 		},
 		{
-			opCode:           OpWRQ,
+			opCode:           common.OpWRQ,
 			req:              sampleWRQ(),
 			expectedFileName: "HelloW",
 		},
@@ -164,8 +166,8 @@ func TestHandleHandshake(t *testing.T) {
 	mockWRQHandler := &mockHandler{
 		replyChan: wChan,
 	}
-	handlerMapping[OpRRQ] = mockRRQHandler
-	handlerMapping[OpWRQ] = mockWRQHandler
+	handlerMapping[common.OpRRQ] = mockRRQHandler
+	handlerMapping[common.OpWRQ] = mockWRQHandler
 
 	for i, tc := range testCases {
 		conn := &mockPacketConn{
@@ -189,9 +191,9 @@ func TestHandleHandshake(t *testing.T) {
 		// in another goroutine
 		var waitChan chan struct{}
 		switch tc.opCode {
-		case OpRRQ:
+		case common.OpRRQ:
 			waitChan = rChan
-		case OpWRQ:
+		case common.OpWRQ:
 			waitChan = wChan
 		}
 		select {
@@ -225,7 +227,7 @@ func TestParseRequestPacket(t *testing.T) {
 		{
 			packet: []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'M', 'o', 'd', 'e', 0},
 			expectedPacket: &RequestPacket{
-				OpCode:   OpRRQ,
+				OpCode:   common.OpRRQ,
 				Filename: "Hello",
 				Mode:     "Mode",
 			},
@@ -235,7 +237,7 @@ func TestParseRequestPacket(t *testing.T) {
 		{
 			packet: []byte{0, 2, 66, 0, 66, 0},
 			expectedPacket: &RequestPacket{
-				OpCode:   OpWRQ,
+				OpCode:   common.OpWRQ,
 				Filename: "B",
 				Mode:     "B",
 			},
@@ -292,37 +294,37 @@ func TestCreateErrorPacket(t *testing.T) {
 func TestGetOpcode(t *testing.T) {
 	testCases := []struct {
 		data           []byte
-		expectedOpcode OpCode
+		expectedOpcode common.OpCode
 		shouldError    bool
 	}{
 		// Standard RRQ
 		{
 			data:           []byte{0, 1},
-			expectedOpcode: OpRRQ,
+			expectedOpcode: common.OpRRQ,
 			shouldError:    false,
 		},
 		// Empty data
 		{
 			data:           []byte{},
-			expectedOpcode: OpERROR,
+			expectedOpcode: common.OpERROR,
 			shouldError:    true,
 		},
 		// Unknown opcode
 		{
 			data:           []byte{0, 99},
-			expectedOpcode: OpERROR,
+			expectedOpcode: common.OpERROR,
 			shouldError:    true,
 		},
 		// Only 1 byte
 		{
 			data:           []byte{1},
-			expectedOpcode: OpERROR,
+			expectedOpcode: common.OpERROR,
 			shouldError:    true,
 		},
 		// More than 2 bytes
 		{
 			data:           []byte{0, 1, 2},
-			expectedOpcode: OpRRQ,
+			expectedOpcode: common.OpRRQ,
 			shouldError:    false,
 		},
 	}

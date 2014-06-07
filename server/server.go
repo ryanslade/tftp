@@ -11,6 +11,8 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"github.com/ryanslade/tftp/common"
 )
 
 // Flags
@@ -18,35 +20,13 @@ var (
 	port int
 )
 
-type OpCode uint16
-
-const (
-	OpRRQ   OpCode = 1
-	OpWRQ   OpCode = 2
-	OpDATA  OpCode = 3
-	OpACK   OpCode = 4
-	OpERROR OpCode = 5
-)
-
-var OpCodeNames = map[OpCode]string{
-	OpRRQ:   "RRQ",
-	OpWRQ:   "WRQ",
-	OpDATA:  "DATA",
-	OpACK:   "ACK",
-	OpERROR: "ERROR",
-}
-
-func (o OpCode) String() string {
-	return OpCodeNames[o]
-}
-
 const (
 	blockSize     = 512
 	maxPacketSize = blockSize * 2
 )
 
 type RequestPacket struct {
-	OpCode   OpCode
+	OpCode   common.OpCode
 	Filename string
 	Mode     string
 }
@@ -61,18 +41,18 @@ func (r requestHandlerFunc) serve(remoteAddr net.Addr, filename string) {
 	r(remoteAddr, filename)
 }
 
-var handlerMapping = map[OpCode]requestHandler{
-	OpRRQ: requestHandlerFunc(handleReadRequest),
-	OpWRQ: requestHandlerFunc(handleWriteRequest),
+var handlerMapping = map[common.OpCode]requestHandler{
+	common.OpRRQ: requestHandlerFunc(handleReadRequest),
+	common.OpWRQ: requestHandlerFunc(handleWriteRequest),
 }
 
-func getOpCode(packet []byte) (OpCode, error) {
+func getOpCode(packet []byte) (common.OpCode, error) {
 	if len(packet) < 2 {
-		return OpERROR, fmt.Errorf("Packet too small to get opcode")
+		return common.OpERROR, fmt.Errorf("Packet too small to get opcode")
 	}
-	opcode := OpCode(binary.BigEndian.Uint16(packet))
+	opcode := common.OpCode(binary.BigEndian.Uint16(packet))
 	if opcode > 5 {
-		return OpERROR, fmt.Errorf("Unknown opcode: %d", opcode)
+		return common.OpERROR, fmt.Errorf("Unknown opcode: %d", opcode)
 	}
 	return opcode, nil
 }
@@ -161,8 +141,8 @@ func handleHandshake(conn net.PacketConn) error {
 // -----------------------------------------
 func createErrorPacket(code uint16, message string) []byte {
 	buf := make([]byte, 2+2+len(message)+1)
-	binary.BigEndian.PutUint16(buf, uint16(OpERROR)) // 2 bytes
-	binary.BigEndian.PutUint16(buf[2:], code)        // 2 bytes
+	binary.BigEndian.PutUint16(buf, uint16(common.OpERROR)) // 2 bytes
+	binary.BigEndian.PutUint16(buf[2:], code)               // 2 bytes
 	copy(buf[4:], []byte(message))
 	buf[len(buf)-1] = byte(0)
 	return buf
@@ -174,7 +154,7 @@ func createErrorPacket(code uint16, message string) []byte {
 //  ----------------------------------
 func createDataPacket(blockNumber uint16, data []byte) []byte {
 	buf := make([]byte, 2+2+len(data))
-	binary.BigEndian.PutUint16(buf, uint16(OpDATA))
+	binary.BigEndian.PutUint16(buf, uint16(common.OpDATA))
 	binary.BigEndian.PutUint16(buf[2:], blockNumber)
 	copy(buf[4:], data)
 	return buf
@@ -188,7 +168,7 @@ func createDataPacket(blockNumber uint16, data []byte) []byte {
 //  ---------------------
 func createAckPacket(tid uint16) []byte {
 	buf := make([]byte, 4)
-	binary.BigEndian.PutUint16(buf, uint16(OpACK))
+	binary.BigEndian.PutUint16(buf, uint16(common.OpACK))
 	binary.BigEndian.PutUint16(buf[2:], tid)
 	return buf
 }
@@ -202,7 +182,7 @@ func parseAckPacket(packet []byte) (tid uint16, err error) {
 	if err != nil {
 		return 0, fmt.Errorf("Error getting opcode: %v", err)
 	}
-	if op != OpACK {
+	if op != common.OpACK {
 		return 0, fmt.Errorf("Expected ACK packet, got OpCode: %d", op)
 	}
 	tid = binary.BigEndian.Uint16(packet[2:])
@@ -348,7 +328,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 			log.Println(err)
 			return
 		}
-		if opcode != OpDATA {
+		if opcode != common.OpDATA {
 			log.Printf("Expected DATA packet, got %v\n", opcode)
 			return
 		}
