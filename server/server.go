@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"flag"
@@ -306,6 +307,9 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 	}
 	defer f.Close()
 
+	bw := bufio.NewWriter(f)
+	defer bw.Flush()
+
 	tid := uint16(0)
 
 	// Acknowledge WRQ
@@ -345,9 +349,8 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 			return
 		}
 
-		// TODO: Wrap file io in a buffered writer?
 		// Write data to disk
-		_, err = f.Write(packet[4:n])
+		_, err = bw.Write(packet[4:n])
 		if err != nil {
 			log.Println(err)
 			return
