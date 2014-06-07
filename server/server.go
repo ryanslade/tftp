@@ -233,13 +233,15 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 	}
 	defer f.Close()
 
+	br := bufio.NewReader(f)
+
 	var tid uint16
 	buffer := make([]byte, blockSize)
 	ackBuf := make([]byte, 4)
 	for {
 		tid++
 
-		n, err := f.Read(buffer)
+		n, err := br.Read(buffer)
 		if err == io.EOF {
 			log.Println("Done sending", filename)
 			break
