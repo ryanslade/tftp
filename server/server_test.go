@@ -208,7 +208,7 @@ func TestHandleHandshake(t *testing.T) {
 func TestParseRequestPacket(t *testing.T) {
 	testCases := []struct {
 		packet         []byte
-		expectedPacket *RequestPacket
+		expectedPacket *common.RequestPacket
 		shouldError    bool
 	}{
 		// Nil packet
@@ -226,7 +226,7 @@ func TestParseRequestPacket(t *testing.T) {
 		// RRQ
 		{
 			packet: []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'M', 'o', 'd', 'e', 0},
-			expectedPacket: &RequestPacket{
+			expectedPacket: &common.RequestPacket{
 				OpCode:   common.OpRRQ,
 				Filename: "Hello",
 				Mode:     "Mode",
@@ -236,7 +236,7 @@ func TestParseRequestPacket(t *testing.T) {
 		// WRQ
 		{
 			packet: []byte{0, 2, 66, 0, 66, 0},
-			expectedPacket: &RequestPacket{
+			expectedPacket: &common.RequestPacket{
 				OpCode:   common.OpWRQ,
 				Filename: "B",
 				Mode:     "B",

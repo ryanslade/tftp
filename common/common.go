@@ -21,3 +21,9 @@ var OpCodeNames = map[OpCode]string{
 func (o OpCode) String() string {
 	return OpCodeNames[o]
 }
+
+type RequestPacket struct {
+	OpCode   OpCode
+	Filename string
+	Mode     string
+}

@@ -25,12 +25,6 @@ const (
 	maxPacketSize = blockSize * 2
 )
 
-type RequestPacket struct {
-	OpCode   common.OpCode
-	Filename string
-	Mode     string
-}
-
 type requestHandler interface {
 	serve(remoteAddr net.Addr, filename string)
 }
@@ -63,7 +57,7 @@ func getOpCode(packet []byte) (common.OpCode, error) {
 // ------------------------------------------------
 // | Opcode |  Filename  |   0  |    Mode    |   0  |
 // ------------------------------------------------
-func parseRequestPacket(packet []byte) (*RequestPacket, error) {
+func parseRequestPacket(packet []byte) (*common.RequestPacket, error) {
 	// Get opcode
 	opcode, err := getOpCode(packet)
 	if err != nil {
@@ -88,7 +82,7 @@ func parseRequestPacket(packet []byte) (*RequestPacket, error) {
 	// Remove trailing 0
 	mode = mode[:len(mode)-1]
 
-	return &RequestPacket{
+	return &common.RequestPacket{
 		OpCode:   opcode,
 		Mode:     string(mode),
 		Filename: string(filename),
