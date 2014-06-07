@@ -372,9 +372,7 @@ func init() {
 	flag.IntVar(&port, "port", 69, "Port to listen on")
 }
 
-func main() {
-	flag.Parse()
-
+func listenAndServe(port int) {
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Println(err)
@@ -395,4 +393,9 @@ func main() {
 			continue
 		}
 	}
+}
+
+func main() {
+	flag.Parse()
+	listenAndServe(port)
 }
