@@ -288,6 +288,15 @@ func sendError(code uint16, message string, conn net.PacketConn, remoteAddress n
 	return
 }
 
+func fileCleanup(f *os.File) {
+	if err := f.Sync(); err != nil {
+		log.Println("Error syncing %s, %v", f.Name(), err)
+	}
+	if err := f.Close(); err != nil {
+		log.Println("Error closing file %s, %v", f.Name(), err)
+	}
+}
+
 func handleWriteRequest(remoteAddress net.Addr, filename string) {
 	log.Println("Handling WRQ")
 
@@ -305,7 +314,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 		sendError(0, err.Error(), conn, remoteAddress)
 		return
 	}
-	defer f.Close()
+	defer fileCleanup(f)
 
 	bw := bufio.NewWriter(f)
 	defer bw.Flush()
