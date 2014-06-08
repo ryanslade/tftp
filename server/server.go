@@ -356,10 +356,6 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 	}
 }
 
-func init() {
-	flag.IntVar(&port, "port", 69, "Port to listen on")
-}
-
 func listenAndServe(port int) {
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -381,6 +377,10 @@ func listenAndServe(port int) {
 			continue
 		}
 	}
+}
+
+func init() {
+	flag.IntVar(&port, "port", 69, "Port to listen on")
 }
 
 func main() {
