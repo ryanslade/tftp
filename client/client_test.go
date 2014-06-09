@@ -66,6 +66,17 @@ func TestParseArgs(t *testing.T) {
 			shouldError: true,
 			expected:    clientState{},
 		},
+		// Invalid host/port
+		{
+			args:        "client put blah::1234 somefile.txt",
+			shouldError: true,
+			expected:    clientState{},
+		},
+		{
+			args:        "client put :1234 somefile.txt",
+			shouldError: true,
+			expected:    clientState{},
+		},
 	}
 
 	for i, tc := range testCases {

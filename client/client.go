@@ -49,6 +49,10 @@ func parseArgs(args []string) (clientState, error) {
 	state.host = host
 	state.port = port
 
+	if host == "" {
+		return clientState{}, fmt.Errorf("Host can't be empty")
+	}
+
 	state.filename = args[3]
 
 	return state, nil
