@@ -25,9 +25,6 @@ type clientState struct {
 	port     string
 }
 
-func init() {
-}
-
 func parseArgs(args []string) (clientState, error) {
 	state := clientState{}
 	if len(args) != 4 {
@@ -58,7 +55,21 @@ func parseArgs(args []string) (clientState, error) {
 	return state, nil
 }
 
+func handleState(s clientState) {
+	switch s.mode {
+	case modePut:
+		fmt.Println("Doing put")
+	case modeGet:
+		fmt.Println("Doing get")
+	}
+}
+
 func main() {
-	// client put|get host:port filename
-	fmt.Println(os.Args)
+	state, err := parseArgs(os.Args)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("Expected", expectedArgFormat)
+		return
+	}
+	handleState(state)
 }
