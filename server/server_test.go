@@ -16,28 +16,6 @@ func init() {
 	handlerMapping = map[common.OpCode]requestHandler{}
 }
 
-func TestCreateDataPacket(t *testing.T) {
-	testCases := []struct {
-		blockNumber uint16
-		data        []byte
-		expected    []byte
-	}{
-		{
-			blockNumber: 1,
-			data:        []byte{1, 2, 3, 4, 5},
-			expected:    []byte{0, 3, 0, 1, 1, 2, 3, 4, 5},
-		},
-	}
-
-	for i, tc := range testCases {
-		packet := createDataPacket(tc.blockNumber, tc.data)
-		if !reflect.DeepEqual(packet, tc.expected) {
-			t.Errorf("Expected and actual packet not equal (%d)", i)
-			t.Error(packet)
-		}
-	}
-}
-
 func TestCreateAckPacket(t *testing.T) {
 	testCases := []struct {
 		tid      uint16
@@ -83,7 +61,7 @@ func TestParseACKPacket(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		tid, err := parseAckPacket(tc.packet)
+		tid, err := common.ParseAckPacket(tc.packet)
 		if tc.errExpected && err == nil {
 			t.Errorf("Expected an error, got nil (%d)", i)
 			continue
@@ -330,7 +308,7 @@ func TestGetOpcode(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		oc, err := getOpCode(tc.data)
+		oc, err := common.GetOpCode(tc.data)
 		if tc.shouldError && err == nil {
 			t.Errorf("Expected error, didn't get one (%d)", i)
 			continue

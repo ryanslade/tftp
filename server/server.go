@@ -6,11 +6,11 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ryanslade/tftp/common"
 )
@@ -40,17 +40,6 @@ var handlerMapping = map[common.OpCode]requestHandler{
 	common.OpWRQ: requestHandlerFunc(handleWriteRequest),
 }
 
-func getOpCode(packet []byte) (common.OpCode, error) {
-	if len(packet) < 2 {
-		return common.OpERROR, fmt.Errorf("Packet too small to get opcode")
-	}
-	opcode := common.OpCode(binary.BigEndian.Uint16(packet))
-	if opcode > 5 {
-		return common.OpERROR, fmt.Errorf("Unknown opcode: %d", opcode)
-	}
-	return opcode, nil
-}
-
 // parses a request packet in the form:
 //
 //  2 bytes     string    1 byte     string   1 byte
@@ -59,7 +48,7 @@ func getOpCode(packet []byte) (common.OpCode, error) {
 // ------------------------------------------------
 func parseRequestPacket(packet []byte) (*common.RequestPacket, error) {
 	// Get opcode
-	opcode, err := getOpCode(packet)
+	opcode, err := common.GetOpCode(packet)
 	if err != nil {
 		return nil, err
 	}
@@ -142,18 +131,6 @@ func createErrorPacket(code uint16, message string) []byte {
 	return buf
 }
 
-//  2 bytes     2 bytes      n bytes
-//  ----------------------------------
-// | Opcode |   Block #  |   Data     |
-//  ----------------------------------
-func createDataPacket(blockNumber uint16, data []byte) []byte {
-	buf := make([]byte, 2+2+len(data))
-	binary.BigEndian.PutUint16(buf, uint16(common.OpDATA))
-	binary.BigEndian.PutUint16(buf[2:], blockNumber)
-	copy(buf[4:], data)
-	return buf
-}
-
 // writes an ack packet to the supplied byte slice
 //
 //  2 bytes     2 bytes
@@ -167,24 +144,9 @@ func createAckPacket(tid uint16) []byte {
 	return buf
 }
 
-//  2 bytes     2 bytes
-//  ---------------------
-// | Opcode |   Block #  |
-//  ---------------------
-func parseAckPacket(packet []byte) (tid uint16, err error) {
-	op, err := getOpCode(packet)
-	if err != nil {
-		return 0, fmt.Errorf("Error getting opcode: %v", err)
-	}
-	if op != common.OpACK {
-		return 0, fmt.Errorf("Expected ACK packet, got OpCode: %d", op)
-	}
-	tid = binary.BigEndian.Uint16(packet[2:])
-	return tid, nil
-}
-
 func handleReadRequest(remoteAddress net.Addr, filename string) {
-	log.Println("Handling RRQ")
+	start := time.Now()
+	log.Println("Handling RRQ for", filename)
 
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.IPv4zero,
@@ -208,51 +170,11 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 	defer f.Close()
 
 	br := bufio.NewReader(f)
-
-	var tid uint16
-	buffer := make([]byte, blockSize)
-	ackBuf := make([]byte, 4)
-	for {
-		tid++
-
-		n, err := br.Read(buffer)
-		if err == io.EOF {
-			log.Println("Done sending", filename)
-			break
-		}
-		if err != nil {
-			log.Println("Error reading file:", err)
-			break
-		}
-
-		packet := createDataPacket(tid, buffer[:n])
-		n, err = conn.WriteTo(packet, remoteAddress)
-		if err != nil {
-			log.Println("Error writing data packet:", err)
-			sendError(0, err.Error(), conn, remoteAddress)
-			break
-		}
-
-		// Read ack
-		i, _, err := conn.ReadFrom(ackBuf)
-		if err != nil {
-			log.Println("Error reading ACK packet:", err)
-			break
-		}
-		if i != 4 {
-			log.Println("Expected 4 bytes read for ACK packet, got", i)
-			break
-		}
-		ackTid, err := parseAckPacket(ackBuf)
-		if err != nil {
-			log.Println("Error parsing ACK packet:", err)
-			break
-		}
-		if ackTid != tid {
-			log.Printf("ACK tid: %d, does not match expected: %d", ackTid, tid)
-			break
-		}
+	err = common.ReadLoop(br, conn, remoteAddress, blockSize)
+	if err != nil {
+		log.Println("Error handling read:", err)
 	}
+	log.Printf("Done sending %s. (%v)", filename, time.Since(start))
 }
 
 func sendError(code uint16, message string, conn net.PacketConn, remoteAddress net.Addr) {
@@ -317,7 +239,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 			return
 		}
 
-		opcode, err := getOpCode(packet)
+		opcode, err := common.GetOpCode(packet)
 		if err != nil {
 			log.Println(err)
 			return
