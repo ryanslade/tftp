@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ryanslade/tftp/common"
 )
@@ -183,8 +184,50 @@ func parseAckPacket(packet []byte) (tid uint16, err error) {
 	return tid, nil
 }
 
+func readLoop(r io.Reader, conn net.PacketConn, remoteAddr net.Addr) error {
+	var tid uint16
+	buffer := make([]byte, blockSize)
+	ackBuf := make([]byte, 4)
+	for {
+		tid++
+
+		n, err := r.Read(buffer)
+		if err == io.EOF {
+			// We're done
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("Error reading data: %v", err)
+		}
+
+		packet := createDataPacket(tid, buffer[:n])
+		n, err = conn.WriteTo(packet, remoteAddr)
+		if err != nil {
+			return fmt.Errorf("Error writing data packet: %v", err)
+		}
+
+		// Read ack
+		i, _, err := conn.ReadFrom(ackBuf)
+		if err != nil {
+			return fmt.Errorf("Error reading ACK packet: %v", err)
+		}
+		if i != 4 {
+			return fmt.Errorf("Expected 4 bytes read for ACK packet, got %d", i)
+		}
+		ackTid, err := parseAckPacket(ackBuf)
+		if err != nil {
+			return fmt.Errorf("Error parsing ACK packet: %v", err)
+		}
+		if ackTid != tid {
+			return fmt.Errorf("ACK tid: %d, does not match expected: %d", ackTid, tid)
+		}
+	}
+	return nil
+}
+
 func handleReadRequest(remoteAddress net.Addr, filename string) {
-	log.Println("Handling RRQ")
+	start := time.Now()
+	log.Println("Handling RRQ for", filename)
 
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.IPv4zero,
@@ -208,51 +251,11 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 	defer f.Close()
 
 	br := bufio.NewReader(f)
-
-	var tid uint16
-	buffer := make([]byte, blockSize)
-	ackBuf := make([]byte, 4)
-	for {
-		tid++
-
-		n, err := br.Read(buffer)
-		if err == io.EOF {
-			log.Println("Done sending", filename)
-			break
-		}
-		if err != nil {
-			log.Println("Error reading file:", err)
-			break
-		}
-
-		packet := createDataPacket(tid, buffer[:n])
-		n, err = conn.WriteTo(packet, remoteAddress)
-		if err != nil {
-			log.Println("Error writing data packet:", err)
-			sendError(0, err.Error(), conn, remoteAddress)
-			break
-		}
-
-		// Read ack
-		i, _, err := conn.ReadFrom(ackBuf)
-		if err != nil {
-			log.Println("Error reading ACK packet:", err)
-			break
-		}
-		if i != 4 {
-			log.Println("Expected 4 bytes read for ACK packet, got", i)
-			break
-		}
-		ackTid, err := parseAckPacket(ackBuf)
-		if err != nil {
-			log.Println("Error parsing ACK packet:", err)
-			break
-		}
-		if ackTid != tid {
-			log.Printf("ACK tid: %d, does not match expected: %d", ackTid, tid)
-			break
-		}
+	err = readLoop(br, conn, remoteAddress)
+	if err != nil {
+		log.Println("Error handling read:", err)
 	}
+	log.Printf("Done sending %s. (%v)", filename, time.Since(start))
 }
 
 func sendError(code uint16, message string, conn net.PacketConn, remoteAddress net.Addr) {
