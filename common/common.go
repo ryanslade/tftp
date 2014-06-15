@@ -107,6 +107,14 @@ func ParseRequestPacket(packet []byte) (*RequestPacket, error) {
 	}, nil
 }
 
+func (p RequestPacket) ToBytes() []byte {
+	buf := make([]byte, 2+len(p.Filename)+1+len(p.Mode)+1)
+	binary.BigEndian.PutUint16(buf, uint16(p.OpCode))
+	copy(buf[2:], p.Filename)
+	copy(buf[2+len(p.Filename)+1:], p.Mode)
+	return buf
+}
+
 // GetOpCode will attempt to parse the OpCode from the packet passed in
 func GetOpCode(packet []byte) (OpCode, error) {
 	if len(packet) < 2 {

@@ -27,6 +27,44 @@ func TestCreateDataPacket(t *testing.T) {
 	}
 }
 
+func TestRequestPacketToBytes(t *testing.T) {
+	testCases := []struct {
+		packet        RequestPacket
+		expectedBytes []byte
+	}{
+		// RRQ
+		{
+			expectedBytes: []byte{0, 1, 'H', 'e', 'l', 'l', 'o', 0, 'M', 'o', 'd', 'e', 0},
+			packet: RequestPacket{
+				OpCode:   OpRRQ,
+				Filename: "Hello",
+				Mode:     "Mode",
+			},
+		},
+		// WRQ
+		{
+			expectedBytes: []byte{0, 2, 66, 0, 66, 0},
+			packet: RequestPacket{
+				OpCode:   OpWRQ,
+				Filename: "B",
+				Mode:     "B",
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		b := tc.packet.ToBytes()
+		if !reflect.DeepEqual(tc.expectedBytes, b) {
+			t.Errorf("Test case %d failed", i)
+			t.Errorf("Expected")
+			t.Errorf("%v", tc.expectedBytes)
+			t.Errorf("Got")
+			t.Errorf("%v", b)
+			t.Error()
+		}
+	}
+}
+
 func TestParseRequestPacket(t *testing.T) {
 	testCases := []struct {
 		packet         []byte
@@ -94,10 +132,12 @@ func TestParseRequestPacket(t *testing.T) {
 			t.Errorf("%v (%d)", err, i)
 		}
 		if !reflect.DeepEqual(tc.expectedPacket, packet) {
+			t.Errorf("Test case %d failed", i)
 			t.Errorf("Expected")
 			t.Errorf("%v", tc.expectedPacket)
 			t.Errorf("Got")
 			t.Errorf("%v", packet)
+			t.Error()
 		}
 	}
 }
