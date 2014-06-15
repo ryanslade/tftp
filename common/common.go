@@ -1,10 +1,16 @@
 package common
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
+)
+
+const (
+	BlockSize     = 512
+	MaxPacketSize = BlockSize * 2
 )
 
 type OpCode uint16
@@ -61,6 +67,44 @@ func ParseAckPacket(packet []byte) (tid uint16, err error) {
 	}
 	tid = binary.BigEndian.Uint16(packet[2:])
 	return tid, nil
+}
+
+// parses a request packet in the form:
+//
+//  2 bytes     string    1 byte     string   1 byte
+// ------------------------------------------------
+// | Opcode |  Filename  |   0  |    Mode    |   0  |
+// ------------------------------------------------
+func ParseRequestPacket(packet []byte) (*RequestPacket, error) {
+	// Get opcode
+	opcode, err := GetOpCode(packet)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get filename
+	reader := bytes.NewBuffer(packet[2:])
+
+	filename, err := reader.ReadBytes(byte(0))
+	if err != nil {
+		return nil, fmt.Errorf("Error reading filename: %v", err)
+	}
+	// Remove trailing 0
+	filename = filename[:len(filename)-1]
+
+	// Get mode
+	mode, err := reader.ReadBytes(byte(0))
+	if err != nil {
+		return nil, fmt.Errorf("Error reading mode: %v", err)
+	}
+	// Remove trailing 0
+	mode = mode[:len(mode)-1]
+
+	return &RequestPacket{
+		OpCode:   opcode,
+		Mode:     string(mode),
+		Filename: string(filename),
+	}, nil
 }
 
 // GetOpCode will attempt to parse the OpCode from the packet passed in

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"flag"
 	"fmt"
@@ -20,11 +19,6 @@ var (
 	port int
 )
 
-const (
-	blockSize     = 512
-	maxPacketSize = blockSize * 2
-)
-
 type requestHandler interface {
 	serve(remoteAddr net.Addr, filename string)
 }
@@ -40,44 +34,6 @@ var handlerMapping = map[common.OpCode]requestHandler{
 	common.OpWRQ: requestHandlerFunc(handleWriteRequest),
 }
 
-// parses a request packet in the form:
-//
-//  2 bytes     string    1 byte     string   1 byte
-// ------------------------------------------------
-// | Opcode |  Filename  |   0  |    Mode    |   0  |
-// ------------------------------------------------
-func parseRequestPacket(packet []byte) (*common.RequestPacket, error) {
-	// Get opcode
-	opcode, err := common.GetOpCode(packet)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get filename
-	reader := bytes.NewBuffer(packet[2:])
-
-	filename, err := reader.ReadBytes(byte(0))
-	if err != nil {
-		return nil, fmt.Errorf("Error reading filename: %v", err)
-	}
-	// Remove trailing 0
-	filename = filename[:len(filename)-1]
-
-	// Get mode
-	mode, err := reader.ReadBytes(byte(0))
-	if err != nil {
-		return nil, fmt.Errorf("Error reading mode: %v", err)
-	}
-	// Remove trailing 0
-	mode = mode[:len(mode)-1]
-
-	return &common.RequestPacket{
-		OpCode:   opcode,
-		Mode:     string(mode),
-		Filename: string(filename),
-	}, nil
-}
-
 func acceptedMode(mode string) bool {
 	switch strings.ToLower(mode) {
 	case "netascii", "octet", "mail":
@@ -87,18 +43,18 @@ func acceptedMode(mode string) bool {
 }
 
 func handleHandshake(conn net.PacketConn) error {
-	packet := make([]byte, maxPacketSize)
+	packet := make([]byte, common.MaxPacketSize)
 
 	n, remoteAddr, err := conn.ReadFrom(packet)
 	if err != nil {
 		return fmt.Errorf("Error reading from connection: %v", err)
 	}
-	if n == maxPacketSize {
+	if n == common.MaxPacketSize {
 		return fmt.Errorf("Packet too big: %d bytes", n)
 	}
 
 	log.Printf("Request from %v", remoteAddr)
-	req, err := parseRequestPacket(packet)
+	req, err := common.ParseRequestPacket(packet)
 	if err != nil {
 		return fmt.Errorf("Error parsing request packet: %v", err)
 	}
@@ -170,7 +126,7 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 	defer f.Close()
 
 	br := bufio.NewReader(f)
-	err = common.ReadLoop(br, conn, remoteAddress, blockSize)
+	err = common.ReadLoop(br, conn, remoteAddress, common.BlockSize)
 	if err != nil {
 		log.Println("Error handling read:", err)
 	}
@@ -227,7 +183,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 		return
 	}
 
-	packet := make([]byte, maxPacketSize)
+	packet := make([]byte, common.MaxPacketSize)
 
 	for {
 		tid++
@@ -270,7 +226,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 			return
 		}
 
-		if n < 4+blockSize {
+		if n < 4+common.BlockSize {
 			// We're done
 			log.Println("Succesfully received", filename)
 			return

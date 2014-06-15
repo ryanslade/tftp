@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
+
+	"github.com/ryanslade/tftp/common"
 )
 
 const (
@@ -55,10 +59,41 @@ func parseArgs(args []string) (clientState, error) {
 	return state, nil
 }
 
+// handle reading a local file and sending it to the server
+func handlePut(filename, host, port string) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return fmt.Errorf("Error opening file: %v", err)
+	}
+	defer f.Close()
+
+	br := bufio.NewReader(f)
+
+	// Create conn and remoteAddr
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", host, port))
+	if err != nil {
+		return fmt.Errorf("Error resolving address: %v", err)
+	}
+	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		return fmt.Errorf("Error dialing: %v", err)
+	}
+
+	// Send WRQ packet
+
+	// ReadLoop
+	common.ReadLoop(br, conn, addr, common.BlockSize)
+
+	return nil
+}
+
 func handleState(s clientState) {
 	switch s.mode {
 	case modePut:
-		fmt.Println("Doing put")
+		if err := handlePut(s.filename, s.host, s.port); err != nil {
+			log.Printf("Error performing put: %v", err)
+		}
+
 	case modeGet:
 		fmt.Println("Doing get")
 	}
