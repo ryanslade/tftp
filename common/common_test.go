@@ -43,7 +43,7 @@ func TestRequestPacketToBytes(t *testing.T) {
 		},
 		// WRQ
 		{
-			expectedBytes: []byte{0, 2, 66, 0, 66, 0},
+			expectedBytes: []byte{0, 2, 'B', 0, 'B', 0},
 			packet: RequestPacket{
 				OpCode:   OpWRQ,
 				Filename: "B",

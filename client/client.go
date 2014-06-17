@@ -70,18 +70,44 @@ func handlePut(filename, host, port string) error {
 	br := bufio.NewReader(f)
 
 	// Create conn and remoteAddr
-	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", host, port))
+	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
 		return fmt.Errorf("Error resolving address: %v", err)
 	}
-	conn, err := net.DialUDP("udp", nil, addr)
+
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.IPv4zero,
+		Port: 0,
+	})
 	if err != nil {
-		return fmt.Errorf("Error dialing: %v", err)
+		return fmt.Errorf("Error setting up connection: %v", err)
 	}
 
 	// Send WRQ packet
+	wrq := common.RequestPacket{
+		OpCode:   common.OpWRQ,
+		Filename: filename,
+		Mode:     "octet",
+	}
+
+	_, err = conn.WriteTo(wrq.ToBytes(), remoteAddr)
+	if err != nil {
+		return fmt.Errorf("Error sending WRQ packet: %v", err)
+	}
+
+	// Get the ACK
+	ackBuf := make([]byte, 4)
+	_, addr, err := conn.ReadFrom(ackBuf)
+	if err != nil {
+		return fmt.Errorf("Error reading ACK packet: %v", err)
+	}
+	_, err = common.ParseAckPacket(ackBuf)
+	if err != nil {
+		return fmt.Errorf("Error parsing ACK packet: %v", err)
+	}
 
 	// ReadLoop
+	// TODO: Rename. ReadLoop is confusing.. read from what? File or Connection?
 	common.ReadLoop(br, conn, addr, common.BlockSize)
 
 	return nil
