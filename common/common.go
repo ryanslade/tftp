@@ -130,7 +130,7 @@ func GetOpCode(packet []byte) (OpCode, error) {
 // ReadLoop will read from r in blockSize chunks, sending each chunk to through conn
 // to remoteAddr. After each send it will wait for an ACK packet. It will loop until
 // EOF on r.
-func ReadLoop(r io.Reader, conn net.PacketConn, remoteAddr net.Addr, blockSize int) error {
+func ReadFileLoop(r io.Reader, conn net.PacketConn, remoteAddr net.Addr, blockSize int) error {
 	var tid uint16
 	buffer := make([]byte, blockSize)
 	ackBuf := make([]byte, 4)

@@ -108,7 +108,7 @@ func handlePut(filename, host, port string) error {
 
 	// ReadLoop
 	// TODO: Rename. ReadLoop is confusing.. read from what? File or Connection?
-	common.ReadLoop(br, conn, addr, common.BlockSize)
+	common.ReadFileLoop(br, conn, addr, common.BlockSize)
 
 	return nil
 }
