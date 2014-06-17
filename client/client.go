@@ -70,7 +70,7 @@ func handlePut(filename, host, port string) error {
 	br := bufio.NewReader(f)
 
 	// Create conn and remoteAddr
-	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", host, port))
+	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
 		return fmt.Errorf("Error resolving address: %v", err)
 	}
@@ -90,14 +90,14 @@ func handlePut(filename, host, port string) error {
 		Mode:     "octet",
 	}
 
-	_, err = conn.WriteTo(wrq.ToBytes(), remoteAddr)
+	_, err = conn.WriteTo(wrq.ToBytes(), serverAddr)
 	if err != nil {
 		return fmt.Errorf("Error sending WRQ packet: %v", err)
 	}
 
 	// Get the ACK
 	ackBuf := make([]byte, 4)
-	_, addr, err := conn.ReadFrom(ackBuf)
+	_, remoteAddr, err := conn.ReadFrom(ackBuf)
 	if err != nil {
 		return fmt.Errorf("Error reading ACK packet: %v", err)
 	}
@@ -108,7 +108,7 @@ func handlePut(filename, host, port string) error {
 
 	// ReadLoop
 	// TODO: Rename. ReadLoop is confusing.. read from what? File or Connection?
-	common.ReadFileLoop(br, conn, addr, common.BlockSize)
+	common.ReadFileLoop(br, conn, remoteAddr, common.BlockSize)
 
 	return nil
 }
