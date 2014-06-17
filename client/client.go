@@ -29,6 +29,7 @@ type clientState struct {
 	port     string
 }
 
+// TODO: Instead of host port, use host:port
 func parseArgs(args []string) (clientState, error) {
 	state := clientState{}
 	if len(args) != 4 {
@@ -107,7 +108,6 @@ func handlePut(filename, host, port string) error {
 	}
 
 	// ReadLoop
-	// TODO: Rename. ReadLoop is confusing.. read from what? File or Connection?
 	common.ReadFileLoop(br, conn, remoteAddr, common.BlockSize)
 
 	return nil
