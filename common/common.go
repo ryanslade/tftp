@@ -130,8 +130,10 @@ func GetOpCode(packet []byte) (OpCode, error) {
 // ReadLoop will read from r in blockSize chunks, sending each chunk to through conn
 // to remoteAddr. After each send it will wait for an ACK packet. It will loop until
 // EOF on r.
-func ReadFileLoop(r io.Reader, conn net.PacketConn, remoteAddr net.Addr, blockSize int) error {
+func ReadFileLoop(r io.Reader, conn net.PacketConn, remoteAddr net.Addr, blockSize int) (int, error) {
 	var tid uint16
+	var bytesRead int
+
 	buffer := make([]byte, blockSize)
 	ackBuf := make([]byte, 4)
 	for {
@@ -143,30 +145,31 @@ func ReadFileLoop(r io.Reader, conn net.PacketConn, remoteAddr net.Addr, blockSi
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("Error reading data: %v", err)
+			return bytesRead, fmt.Errorf("Error reading data: %v", err)
 		}
+		bytesRead += n
 
 		packet := createDataPacket(tid, buffer[:n])
 		n, err = conn.WriteTo(packet, remoteAddr)
 		if err != nil {
-			return fmt.Errorf("Error writing data packet: %v", err)
+			return bytesRead, fmt.Errorf("Error writing data packet: %v", err)
 		}
 
 		// Read ack
 		i, _, err := conn.ReadFrom(ackBuf)
 		if err != nil {
-			return fmt.Errorf("Error reading ACK packet: %v", err)
+			return bytesRead, fmt.Errorf("Error reading ACK packet: %v", err)
 		}
 		if i != 4 {
-			return fmt.Errorf("Expected 4 bytes read for ACK packet, got %d", i)
+			return bytesRead, fmt.Errorf("Expected 4 bytes read for ACK packet, got %d", i)
 		}
 		ackTid, err := ParseAckPacket(ackBuf)
 		if err != nil {
-			return fmt.Errorf("Error parsing ACK packet: %v", err)
+			return bytesRead, fmt.Errorf("Error parsing ACK packet: %v", err)
 		}
 		if ackTid != tid {
-			return fmt.Errorf("ACK tid: %d, does not match expected: %d", ackTid, tid)
+			return bytesRead, fmt.Errorf("ACK tid: %d, does not match expected: %d", ackTid, tid)
 		}
 	}
-	return nil
+	return bytesRead, nil
 }

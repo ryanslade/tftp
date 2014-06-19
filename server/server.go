@@ -127,11 +127,11 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 	defer f.Close()
 
 	br := bufio.NewReader(f)
-	err = common.ReadFileLoop(br, conn, remoteAddress, common.BlockSize)
+	bytesRead, err := common.ReadFileLoop(br, conn, remoteAddress, common.BlockSize)
 	if err != nil {
 		log.Println("Error handling read:", err)
 	}
-	log.Printf("Done sending %s. (%v)", filename, time.Since(start))
+	log.Printf("Done sending %s. %d bytes in %v", filename, bytesRead, time.Since(start))
 }
 
 func sendError(code uint16, message string, conn net.PacketConn, remoteAddress net.Addr) {
