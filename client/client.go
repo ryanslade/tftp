@@ -83,6 +83,7 @@ func handlePut(filename, host, port string) error {
 	if err != nil {
 		return fmt.Errorf("Error setting up connection: %v", err)
 	}
+	defer conn.Close()
 
 	// Send WRQ packet
 	wrq := common.RequestPacket{

@@ -112,6 +112,7 @@ func handleReadRequest(remoteAddress net.Addr, filename string) {
 		log.Println("Error listening", err)
 		return
 	}
+	defer conn.Close()
 
 	f, err := os.Open(filename)
 	if err != nil {
@@ -160,6 +161,7 @@ func handleWriteRequest(remoteAddress net.Addr, filename string) {
 		log.Println(err)
 		return
 	}
+	defer conn.Close()
 
 	f, err := os.Create(filename)
 	if err != nil {
