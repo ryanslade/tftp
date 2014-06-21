@@ -25,11 +25,9 @@ const (
 type clientState struct {
 	mode     mode
 	filename string
-	host     string
-	port     string
+	address  string
 }
 
-// TODO: Instead of host port, use host:port
 func parseArgs(args []string) (clientState, error) {
 	state := clientState{}
 	if len(args) != 4 {
@@ -48,20 +46,20 @@ func parseArgs(args []string) (clientState, error) {
 	if err != nil {
 		return clientState{}, fmt.Errorf("Error parsing host or port: %v", err)
 	}
-	state.host = host
-	state.port = port
-
 	if host == "" {
-		return clientState{}, fmt.Errorf("Host can't be empty")
+		return clientState{}, fmt.Errorf("Host can't be blank")
 	}
-
+	if port == "" {
+		return clientState{}, fmt.Errorf("Port can't be blank")
+	}
+	state.address = args[2]
 	state.filename = args[3]
 
 	return state, nil
 }
 
 // handle reading a local file and sending it to the server
-func handlePut(filename, host, port string) error {
+func handlePut(filename, address string) error {
 	f, err := os.Open(filename)
 	if err != nil {
 		return fmt.Errorf("Error opening file: %v", err)
@@ -71,7 +69,7 @@ func handlePut(filename, host, port string) error {
 	br := bufio.NewReader(f)
 
 	// Create conn and remoteAddr
-	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", host, port))
+	serverAddr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return fmt.Errorf("Error resolving address: %v", err)
 	}
@@ -117,7 +115,7 @@ func handlePut(filename, host, port string) error {
 func handleState(s clientState) {
 	switch s.mode {
 	case modePut:
-		if err := handlePut(s.filename, s.host, s.port); err != nil {
+		if err := handlePut(s.filename, s.address); err != nil {
 			log.Printf("Error performing put: %v", err)
 		}
 

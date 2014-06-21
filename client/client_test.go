@@ -19,8 +19,7 @@ func TestParseArgs(t *testing.T) {
 			expected: clientState{
 				mode:     modePut,
 				filename: "somefile.txt",
-				host:     "blah",
-				port:     "1234",
+				address:  "blah:1234",
 			},
 		},
 		{
@@ -29,8 +28,7 @@ func TestParseArgs(t *testing.T) {
 			expected: clientState{
 				mode:     modePut,
 				filename: "somefile.txt",
-				host:     "blah",
-				port:     "1234",
+				address:  "blah:1234",
 			},
 		},
 		// Valid get
@@ -40,8 +38,7 @@ func TestParseArgs(t *testing.T) {
 			expected: clientState{
 				mode:     modeGet,
 				filename: "somefile.txt",
-				host:     "blah",
-				port:     "1234",
+				address:  "blah:1234",
 			},
 		},
 		{
@@ -50,8 +47,7 @@ func TestParseArgs(t *testing.T) {
 			expected: clientState{
 				mode:     modeGet,
 				filename: "somefile.txt",
-				host:     "blah",
-				port:     "1234",
+				address:  "blah:1234",
 			},
 		},
 		// Not enough args
@@ -74,6 +70,16 @@ func TestParseArgs(t *testing.T) {
 		},
 		{
 			args:        "client put :1234 somefile.txt",
+			shouldError: true,
+			expected:    clientState{},
+		},
+		{
+			args:        "client put blah: somefile.txt",
+			shouldError: true,
+			expected:    clientState{},
+		},
+		{
+			args:        "client put blah somefile.txt",
 			shouldError: true,
 			expected:    clientState{},
 		},
