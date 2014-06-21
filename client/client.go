@@ -59,6 +59,24 @@ func parseArgs(args []string) (clientState, error) {
 	return state, nil
 }
 
+func getAddrAndConn(address string) (net.Addr, net.PacketConn, error) {
+	// Create conn and remoteAddr
+	serverAddr, err := net.ResolveUDPAddr("udp", address)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Error resolving address: %v", err)
+	}
+
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.IPv4zero,
+		Port: 0,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("Error setting up connection: %v", err)
+	}
+
+	return serverAddr, conn, nil
+}
+
 // handle reading a local file and sending it to the server
 func handlePut(filename, address string) error {
 	f, err := os.Open(filename)
@@ -69,18 +87,9 @@ func handlePut(filename, address string) error {
 
 	br := bufio.NewReader(f)
 
-	// Create conn and remoteAddr
-	serverAddr, err := net.ResolveUDPAddr("udp", address)
+	serverAddr, conn, err := getAddrAndConn(address)
 	if err != nil {
-		return fmt.Errorf("Error resolving address: %v", err)
-	}
-
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.IPv4zero,
-		Port: 0,
-	})
-	if err != nil {
-		return fmt.Errorf("Error setting up connection: %v", err)
+		return err
 	}
 	defer conn.Close()
 
@@ -107,10 +116,32 @@ func handlePut(filename, address string) error {
 		return fmt.Errorf("Error parsing ACK packet: %v", err)
 	}
 
-	// ReadLoop
 	common.ReadFileLoop(br, conn, remoteAddr, common.BlockSize)
 
 	return nil
+}
+
+func handleGet(filename string, address string) error {
+	serverAddr, conn, err := getAddrAndConn(address)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	rrq := common.RequestPacket{
+		OpCode:   common.OpRRQ,
+		Filename: filename,
+		Mode:     "octet",
+	}
+
+	_, err = conn.WriteTo(rrq.ToBytes(), serverAddr)
+	if err != nil {
+		return fmt.Errorf("Error sending RRQ packet: %v", err)
+	}
+
+	// TODO: WriteFileLoop
+
+	return fmt.Errorf("Not implemented")
 }
 
 func handleState(s clientState) {
@@ -121,7 +152,9 @@ func handleState(s clientState) {
 		}
 
 	case modeGet:
-		fmt.Println("Doing get")
+		if err := handleGet(s.filename, s.address); err != nil {
+			log.Printf("Error performing get: %v", err)
+		}
 	}
 }
 
