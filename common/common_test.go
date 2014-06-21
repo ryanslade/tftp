@@ -60,7 +60,6 @@ func TestRequestPacketToBytes(t *testing.T) {
 			t.Errorf("%v", tc.expectedBytes)
 			t.Errorf("Got")
 			t.Errorf("%v", b)
-			t.Error()
 		}
 	}
 }
@@ -137,7 +136,6 @@ func TestParseRequestPacket(t *testing.T) {
 			t.Errorf("%v", tc.expectedPacket)
 			t.Errorf("Got")
 			t.Errorf("%v", packet)
-			t.Error()
 		}
 	}
 }

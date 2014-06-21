@@ -145,10 +145,10 @@ func sendError(code uint16, message string, conn net.PacketConn, remoteAddress n
 
 func fileCleanup(f *os.File) {
 	if err := f.Sync(); err != nil {
-		log.Println("Error syncing %s, %v", f.Name(), err)
+		log.Printf("Error syncing %s, %v", f.Name(), err)
 	}
 	if err := f.Close(); err != nil {
-		log.Println("Error closing file %s, %v", f.Name(), err)
+		log.Printf("Error closing file %s, %v", f.Name(), err)
 	}
 }
 
