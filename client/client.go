@@ -28,6 +28,7 @@ type clientState struct {
 	address  string
 }
 
+// TODO: Maybe default to port 69?
 func parseArgs(args []string) (clientState, error) {
 	state := clientState{}
 	if len(args) != 4 {
