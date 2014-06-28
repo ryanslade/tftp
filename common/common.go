@@ -127,7 +127,89 @@ func GetOpCode(packet []byte) (OpCode, error) {
 	return opcode, nil
 }
 
-// ReadLoop will read from r in blockSize chunks, sending each chunk to through conn
+func SendError(code uint16, message string, conn net.PacketConn, remoteAddress net.Addr) error {
+	errPacket := CreateErrorPacket(0, message)
+	_, err := conn.WriteTo(errPacket, remoteAddress)
+	if err != nil {
+		return fmt.Errorf("Error writing error packet: %v", err)
+	}
+	return nil
+}
+
+// writes an ack packet to the supplied byte slice
+//
+//  2 bytes     2 bytes
+//  ---------------------
+// | Opcode |   Block #  |
+//  ---------------------
+func CreateAckPacket(tid uint16) []byte {
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint16(buf, uint16(OpACK))
+	binary.BigEndian.PutUint16(buf[2:], tid)
+	return buf
+}
+
+// creates an error packet with the following structure:
+//
+// 2 bytes     2 bytes      string    1 byte
+// -----------------------------------------
+// | Opcode |  ErrorCode |   ErrMsg   |   0  |
+// -----------------------------------------
+func CreateErrorPacket(code uint16, message string) []byte {
+	buf := make([]byte, 2+2+len(message)+1)
+	binary.BigEndian.PutUint16(buf, uint16(OpERROR)) // 2 bytes
+	binary.BigEndian.PutUint16(buf[2:], code)        // 2 bytes
+	copy(buf[4:], []byte(message))
+	buf[len(buf)-1] = byte(0)
+	return buf
+}
+
+func WriteFileLoop(w io.Writer, conn net.PacketConn, remoteAddress net.Addr) error {
+	// Assume we have already sent the initial ACK packet
+	tid := uint16(0)
+	packet := make([]byte, MaxPacketSize)
+	for {
+		tid++
+
+		// Read data packet
+		n, _, err := conn.ReadFrom(packet)
+		if err != nil {
+			return fmt.Errorf("Error reading packet: %v", err)
+		}
+
+		opcode, err := GetOpCode(packet)
+		if err != nil {
+			return fmt.Errorf("Error getting opcode: %v", err)
+		}
+		if opcode != OpDATA {
+			return fmt.Errorf("Expected DATA packet, got %v\n", opcode)
+		}
+
+		packetTID := binary.BigEndian.Uint16(packet[2:4])
+		if packetTID != tid {
+			SendError(5, "Unknown transfer id", conn, remoteAddress)
+			return fmt.Errorf("Expected TID %d, got %d\n", tid, packetTID)
+		}
+
+		// Write data to disk
+		_, err = w.Write(packet[4:n])
+		if err != nil {
+			return fmt.Errorf("Error writing: %v", err)
+		}
+
+		ack := CreateAckPacket(tid)
+		_, err = conn.WriteTo(ack, remoteAddress)
+		if err != nil {
+			return fmt.Errorf("Error writing ACK packet: %v", err)
+		}
+
+		if n < 4+BlockSize {
+			return nil
+		}
+	}
+}
+
+// ReadFileLoop will read from r in blockSize chunks, sending each chunk to through conn
 // to remoteAddr. After each send it will wait for an ACK packet. It will loop until
 // EOF on r.
 func ReadFileLoop(r io.Reader, conn net.PacketConn, remoteAddr net.Addr, blockSize int) (int, error) {

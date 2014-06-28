@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"log"
-	"reflect"
 	"testing"
 	"time"
 
@@ -14,30 +13,6 @@ import (
 func init() {
 	log.SetOutput(ioutil.Discard)
 	handlerMapping = map[common.OpCode]requestHandler{}
-}
-
-func TestCreateAckPacket(t *testing.T) {
-	testCases := []struct {
-		tid      uint16
-		expected []byte
-	}{
-		{
-			tid:      1,
-			expected: []byte{0, 4, 0, 1},
-		},
-		{
-			tid:      14,
-			expected: []byte{0, 4, 0, 14},
-		},
-	}
-
-	for i, tc := range testCases {
-		packet := createAckPacket(tc.tid)
-		if !reflect.DeepEqual(packet, tc.expected) {
-			t.Errorf("Expected and actual packet not equal (%d)", i)
-			t.Error(packet)
-		}
-	}
 }
 
 func TestParseACKPacket(t *testing.T) {
@@ -183,17 +158,6 @@ func TestHandleHandshake(t *testing.T) {
 	}
 }
 
-func TestCreateErrorPacket(t *testing.T) {
-	p := createErrorPacket(2, "Hello")
-	expected := []byte{0, 5, 0, 2, 72, 101, 108, 108, 111, 0}
-	if !reflect.DeepEqual(p, expected) {
-		t.Errorf("Expected")
-		t.Errorf("%v", expected)
-		t.Errorf("Got")
-		t.Errorf("%v", p)
-	}
-}
-
 func TestGetOpcode(t *testing.T) {
 	testCases := []struct {
 		data           []byte
@@ -244,15 +208,6 @@ func TestGetOpcode(t *testing.T) {
 		}
 		if oc != tc.expectedOpcode {
 			t.Errorf("Expected: %v, got %v (%d)", tc.expectedOpcode, oc, i)
-		}
-	}
-}
-
-func BenchmarkCreateErrorPacket(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		packet := createErrorPacket(1, "Error")
-		if len(packet) == 0 {
-			b.Fatal("Packet is empty")
 		}
 	}
 }
