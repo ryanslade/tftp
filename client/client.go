@@ -139,9 +139,23 @@ func handleGet(filename string, address string) error {
 		return fmt.Errorf("Error sending RRQ packet: %v", err)
 	}
 
-	// TODO: WriteFileLoop
+	f, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("Error creating file: %v", err)
+	}
+	defer f.Close()
 
-	return fmt.Errorf("Not implemented")
+	bw := bufio.NewWriter(f)
+	defer bw.Flush()
+
+	// TODO: Need to read first data packet
+	// and communicate on the new address
+	err = common.WriteFileLoop(bw, conn, serverAddr)
+	if err != nil {
+		return fmt.Errorf("Error getting file: %v", err)
+	}
+
+	return nil
 }
 
 func handleState(s clientState) {
