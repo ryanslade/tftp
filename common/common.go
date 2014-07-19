@@ -164,6 +164,42 @@ func CreateErrorPacket(code uint16, message string) []byte {
 	return buf
 }
 
+func WriteFile(w io.Writer, conn net.PacketConn, remoteAddress net.Addr, packet []byte, tid uint16) (int, net.Addr, error) {
+	// Read data packet
+	n, replyAddr, err := conn.ReadFrom(packet)
+	if err != nil {
+		return n, replyAddr, fmt.Errorf("Error reading packet: %v", err)
+	}
+
+	opcode, err := GetOpCode(packet)
+	if err != nil {
+		return n, replyAddr, fmt.Errorf("Error getting opcode: %v", err)
+	}
+	if opcode != OpDATA {
+		return n, replyAddr, fmt.Errorf("Expected DATA packet, got %v\n", opcode)
+	}
+
+	packetTID := binary.BigEndian.Uint16(packet[2:4])
+	if packetTID != tid {
+		SendError(5, "Unknown transfer id", conn, remoteAddress)
+		return n, replyAddr, fmt.Errorf("Expected TID %d, got %d\n", tid, packetTID)
+	}
+
+	// Write data to disk
+	_, err = w.Write(packet[4:n])
+	if err != nil {
+		return n, replyAddr, fmt.Errorf("Error writing: %v", err)
+	}
+
+	ack := CreateAckPacket(tid)
+	_, err = conn.WriteTo(ack, replyAddr)
+	if err != nil {
+		return n, replyAddr, fmt.Errorf("Error writing ACK packet: %v", err)
+	}
+
+	return n, replyAddr, nil
+}
+
 func WriteFileLoop(w io.Writer, conn net.PacketConn, remoteAddress net.Addr) error {
 	// Assume we have already sent the initial ACK packet
 	tid := uint16(0)
@@ -171,36 +207,9 @@ func WriteFileLoop(w io.Writer, conn net.PacketConn, remoteAddress net.Addr) err
 	for {
 		tid++
 
-		// Read data packet
-		n, _, err := conn.ReadFrom(packet)
+		n, _, err := WriteFile(w, conn, remoteAddress, packet, tid)
 		if err != nil {
-			return fmt.Errorf("Error reading packet: %v", err)
-		}
-
-		opcode, err := GetOpCode(packet)
-		if err != nil {
-			return fmt.Errorf("Error getting opcode: %v", err)
-		}
-		if opcode != OpDATA {
-			return fmt.Errorf("Expected DATA packet, got %v\n", opcode)
-		}
-
-		packetTID := binary.BigEndian.Uint16(packet[2:4])
-		if packetTID != tid {
-			SendError(5, "Unknown transfer id", conn, remoteAddress)
-			return fmt.Errorf("Expected TID %d, got %d\n", tid, packetTID)
-		}
-
-		// Write data to disk
-		_, err = w.Write(packet[4:n])
-		if err != nil {
-			return fmt.Errorf("Error writing: %v", err)
-		}
-
-		ack := CreateAckPacket(tid)
-		_, err = conn.WriteTo(ack, remoteAddress)
-		if err != nil {
-			return fmt.Errorf("Error writing ACK packet: %v", err)
+			return err
 		}
 
 		if n < 4+BlockSize {

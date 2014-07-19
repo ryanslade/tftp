@@ -148,11 +148,21 @@ func handleGet(filename string, address string) error {
 	bw := bufio.NewWriter(f)
 	defer bw.Flush()
 
-	// TODO: Need to read first data packet
-	// and communicate on the new address
-	err = common.WriteFileLoop(bw, conn, serverAddr)
-	if err != nil {
-		return fmt.Errorf("Error getting file: %v", err)
+	var n int
+	tid := uint16(1)
+	packet := make([]byte, common.MaxPacketSize)
+	for {
+		// Always use the serverAddr returned as it changes after the first packet.
+		n, serverAddr, err = common.WriteFile(bw, conn, serverAddr, packet, tid)
+		if err != nil {
+			return err
+		}
+
+		if n < 4+common.BlockSize {
+			break
+		}
+
+		tid++
 	}
 
 	return nil
